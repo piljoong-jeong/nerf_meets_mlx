@@ -1,3 +1,4 @@
+import mlx.core as mx
 import mlx.nn as nn
 
 class NeRF(nn.Module):
@@ -33,10 +34,47 @@ class NeRF(nn.Module):
         # fmt: on
 
         if True is is_use_view_directions:
-            self.feature_linear = nn.Linear(width_layers, width_layers)
+            self.feature_linear = nn.Linear(width_layers, width_layers) # NOTE: last layer
             self.alpha_linear = nn.Linear(width_layers, 1)
             self.rgb_linear = nn.Linear(width_layers//2, 3)
         else: # FIXME: deprecate
-            self.output_layer = nn.Linear(width_layers, channel_output)
+            self.output_linear = nn.Linear(width_layers, channel_output)
 
         return
+    
+    def forward(
+        self, 
+        x # NOTE: encoded
+    ):
+        input_pos, input_dir = mx.split(
+            x, 
+            [self.channel_input_pos, self.channel_input_dir], 
+            dim=-1
+        )
+
+        # NOTE: forwarding positions
+        h = input_pos
+        for idx, layer_pos in enumerate(self.list_linears_pos):
+
+            h = layer_pos(h)
+            h = nn.relu(h)
+
+            if idx in self.list_skip_connection_layers:
+                h = mx.cat([input_pos, h], dim=-1) # NOTE: skip connection
+
+        # NOTE: forwarding directions
+        if self.is_use_view_directions:
+            alpha = self.alpha_linear(h)
+            feature = self.feature_linear(h)
+            h = mx.cat([feature, input_dir], dim=-1)
+
+            for idx, layer_dir in enumerate(self.list_linears_dir):
+                h = layer_dir(h)
+                h = nn.relu(h)
+
+            rgb = self.rgb_linear(h)
+            outputs = mx.cat([rgb, alpha], dim=-1)
+        else:
+            outputs = self.output_linear(h)
+
+        return outputs
