@@ -63,6 +63,7 @@ class NeRF(nn.Module):
                 h = mx.cat([input_pos, h], dim=-1) # NOTE: skip connection
 
         # NOTE: forwarding directions
+        # NOTE: refactor to be more readable
         if self.is_use_view_directions:
             alpha = self.alpha_linear(h)
             feature = self.feature_linear(h)
