@@ -50,7 +50,7 @@ class Embedder:
             ], dim=-1
         )
     
-def get_embedder(L, i=0):
+def get_embedder(L):
 
     if L == -1:
         return nn.Identity(), 3
