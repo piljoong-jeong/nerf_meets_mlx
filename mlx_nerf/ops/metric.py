@@ -28,7 +28,7 @@ class SSIM:
         c2 = ((k2 := 0.03) * L) ** 2
 
         _, channel, height, width = pred.size()
-        window = self.create_window(w_size, channel)# .to(pred.device)
+        window = self.create_window(w_size, channel)# TODO: find out equivalent of .to(pred.device)
 
     def create_window(self, w_size, sigma):
 
