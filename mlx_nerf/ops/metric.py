@@ -30,12 +30,22 @@ class SSIM:
         _, channel, height, width = pred.size()
         window = self.create_window(w_size, channel)# TODO: find out equivalent of .to(pred.device)
 
-    def create_window(self, w_size, sigma):
+    def create_window(self, w_size, channel):
 
-        return NotImplementedError
+        _1D_window = self.gaussian(w_size, 1.5).unsqueeze(1)
+        _2D_window = _1D_window.mm(_1D_window.t()).float().unsqueeze(0).unsqueeze(0)
+        
+        window = _2D_window.expand(channel, 1, w_size, w_size).contiguous()
+        return window
     
     def gaussian(self, w_size, sigma):
-        return NotImplementedError
+
+        gaussian = mx.Tensor([
+            math.exp(-(x - w_size//2) ** 2) / float(2*sigma ** 2)
+            for x in range(w_size)
+        ])
+
+        return gaussian / gaussian.sum()
     
 class LPIPS:
     def __init__(self) -> None:
