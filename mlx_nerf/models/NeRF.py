@@ -60,21 +60,21 @@ class NeRF(nn.Module):
             h = nn.relu(h)
 
             if idx in self.list_skip_connection_layers:
-                h = mx.cat([input_pos, h], dim=-1) # NOTE: skip connection
+                h = mx.concatenate([input_pos, h], dim=-1) # NOTE: skip connection
 
         # NOTE: forwarding directions
         # NOTE: refactor to be more readable
         if self.is_use_view_directions:
             alpha = self.alpha_linear(h)
             feature = self.feature_linear(h)
-            h = mx.cat([feature, input_dir], dim=-1)
+            h = mx.concatenate([feature, input_dir], dim=-1)
 
             for idx, layer_dir in enumerate(self.list_linears_dir):
                 h = layer_dir(h)
                 h = nn.relu(h)
 
             rgb = self.rgb_linear(h)
-            outputs = mx.cat([rgb, alpha], dim=-1)
+            outputs = mx.concatenate([rgb, alpha], dim=-1)
         else:
             outputs = self.output_linear(h)
 

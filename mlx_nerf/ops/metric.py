@@ -40,7 +40,7 @@ class SSIM:
     
     def gaussian(self, w_size, sigma):
 
-        gaussian = mx.Tensor([
+        gaussian = mx.array([
             math.exp(-(x - w_size//2) ** 2) / float(2*sigma ** 2)
             for x in range(w_size)
         ])
