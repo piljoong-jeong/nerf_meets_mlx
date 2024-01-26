@@ -30,6 +30,22 @@ class SSIM:
         _, channel, height, width = pred.size()
         window = self.create_window(w_size, channel)# TODO: find out equivalent of .to(pred.device)
 
+        NO_PAD = 0
+        mean_pred = nn.Conv2d(pred, window, padding=NO_PAD, 
+                            #   groups=channel
+                              )
+        mean_gt = nn.Conv2d(gt, window, padding=NO_PAD)
+        mean_pred_sq = mean_pred.pow(2)
+        mean_gt_sq = mean_gt.pow(2)
+        mean_pred_gt = mean_pred * mean_gt
+
+        sigma_pred_sq = nn.Conv2d(pred*pred, window, padding=NO_PAD) - mean_pred_sq
+        sigma_gt_sq = nn.Conv2d(gt*gt, window, padding=NO_PAD) - mean_gt_sq
+        cross_correlation = nn.Conv2d(pred*gt, window, padding=NO_PAD) - mean_pred_gt
+
+        # TODO
+
+
     def create_window(self, w_size, channel):
 
         _1D_window = self.gaussian(w_size, 1.5).unsqueeze(1)
