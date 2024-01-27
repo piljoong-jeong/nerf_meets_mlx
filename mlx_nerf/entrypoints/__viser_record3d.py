@@ -4,8 +4,10 @@ from pathlib import Path
 import viser
 import viser.extras
 
+from this_project_settings import get_project_root
+
 def main(
-    data_path: Path = Path(__file__).parent / "assets/record3d_dance",
+    data_path: Path = get_project_root() / "assets/record3d_dance",
     downsample_factor: int = 4,
     max_frames: int = 100,
     share: bool = False,
