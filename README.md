@@ -1,2 +1,2 @@
 # MLX-NeRF
- MLX implementation of NeRF
+MLX implementation of NeRF

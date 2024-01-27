@@ -1,11 +1,20 @@
 import time
+from pathlib import Path
 
 import viser
 import viser.extras
 
-def main():
+def main(
+    data_path: Path = Path(__file__).parent / "assets/record3d_dance",
+    downsample_factor: int = 4,
+    max_frames: int = 100,
+    share: bool = False,
+):
 
     server = viser.ViserServer()
+    print("Loading frames!")
+    loader = viser.extras.Record3dLoader(data_path)
+    num_frames = min(max_frames, loader.num_frames())
 
     num_frames=30
 
