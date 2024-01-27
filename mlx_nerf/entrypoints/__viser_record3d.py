@@ -28,11 +28,11 @@ def init_gui(server: viser.ViserServer, **config) -> None:
         gui_prev_frame = server.add_gui_button("Prev Frame", disabled=True)
         gui_playing = server.add_gui_checkbox("Playing", True)
         gui_framerate = server.add_gui_slider(
-            "FPS", min=1, max=60, step=0.1, initial_value=fps
+            "FPS", min=1, max=60, step=1, initial_value=fps
         )
-        gui_framerate_options = server.add_gui_button_group(
-            "FPS options", ("10", "20", "30", "60")
-        )
+        # gui_framerate_options = server.add_gui_button_group(
+        #     "FPS options", ("10", "20", "30", "60")
+        # )
 
     
 
@@ -115,7 +115,7 @@ def main(
         dark_mode=True,
         # show_logo=True,
         # show_share_button=True,
-        brand_color=(280, 180, 30)
+        brand_color=(255, 133, 133)
     )
 
     while(True):
