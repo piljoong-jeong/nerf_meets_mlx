@@ -1,1 +1,0 @@
-    server = viser.ViserServer()
