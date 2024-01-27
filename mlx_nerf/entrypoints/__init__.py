@@ -3,3 +3,5 @@
 # NOTE: hence, do import manually
 
 from .__viser_record3d import main as viser_record3d
+
+# TODO: set common theme here
