@@ -1,13 +1,12 @@
+"""### this_project.py
+###### in `mlx_nerf/`
+
+
+"""
+
 import sys
 from functools import lru_cache
 from pathlib import Path
-
-@lru_cache(maxsize=1)
-def import_project_root() -> None:
-
-    sys.path.append(str(get_project_root()))
-
-    return
 
 @lru_cache(maxsize=1)
 def get_project_root() -> Path:
@@ -19,3 +18,9 @@ def get_project_root() -> Path:
     """
     return Path(__file__).absolute().parent.parent
 
+@lru_cache(maxsize=1)
+def import_project_root() -> None:
+
+    sys.path.append(str(get_project_root()))
+
+    return

@@ -5,7 +5,7 @@
 
 import tyro
 
-from this_project_settings import import_project_root; import_project_root()
+import this_project; this_project.import_project_root()
 from mlx_nerf import entrypoints
 
 if __name__ == "__main__":
