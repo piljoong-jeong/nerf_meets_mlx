@@ -3,5 +3,6 @@
 # NOTE: hence, do import manually
 
 from .__viser_record3d import main as viser_record3d
+from .__viser_image import main as viser_image
 
 # TODO: set common theme here

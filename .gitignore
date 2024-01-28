@@ -153,3 +153,5 @@ cython_debug/
 
 # NOTE: repository-specific
 assets/
+
+.DS_Store
