@@ -2,6 +2,7 @@ import time
 from pathlib import Path
 from typing import List
 
+import imageio.v3 as imageio
 import numpy as onp
 import viser
 import viser.extras
@@ -46,7 +47,7 @@ def init_gui(server: viser.ViserServer, **config) -> None:
 
 
 def main(
-    data_path: Path = get_project_root() / "assets/record3d_dance",
+    data_path: Path = get_project_root() / "assets/images",
     downsample_factor: int = 4,
     max_frames: int = 100,
     share: bool = False,
@@ -58,6 +59,30 @@ def main(
         server, 
     )
 
-    while(True):
+    server.add_image(
+        "/gt",
+        imageio.imread(str(path_img := data_path / "albert.jpg")),
+        4.0,
+        4.0,
+        format="png", # NOTE: `jpeg` gives strangely stretched image
+        wxyz=(1.0, 0.0, 0.0, 0.0),
+        position=(4.0, 4.0, 0.0),
+    )
 
+    pred = onp.random.randint(
+        0,
+        256,
+        size=(400, 400, 3),
+        dtype=onp.uint8,
+    )
+    while True:
+        server.add_image(
+            "/pred",
+            pred,
+            4.0,
+            4.0,
+            format="png", # NOTE: `jpeg` gives strangely stretched image
+            wxyz=(1.0, 0.0, 0.0, 0.0),
+            position=(4.0, 0.0, 0.0),
+        )
         time.sleep(0.1)
