@@ -47,7 +47,7 @@ def init_gui(server: viser.ViserServer, **config) -> None:
 
 
 def main(
-    data_path: Path = get_project_root() / "assets/images",
+    path_assets: Path = get_project_root() / "assets",
     downsample_factor: int = 4,
     max_frames: int = 100,
     share: bool = False,
@@ -61,7 +61,7 @@ def main(
 
     server.add_image(
         "/gt",
-        imageio.imread(str(path_img := data_path / "albert.jpg")),
+        imageio.imread(str(path_img := path_assets / "images/albert.jpg")),
         4.0,
         4.0,
         format="png", # NOTE: `jpeg` gives strangely stretched image
@@ -85,4 +85,13 @@ def main(
             wxyz=(1.0, 0.0, 0.0, 0.0),
             position=(4.0, 0.0, 0.0),
         )
+
+        """
+        TODO: learning
+
+        - get pixel sample positions
+        - pass into encoder => augment sample positions
+        - (augmented i.e., encoded sample positions, pixel color) => MLP
+        - `mlx`-dependent optimization implementations (say, `.eval()`?)
+        """
         time.sleep(0.1)
