@@ -8,6 +8,8 @@ import sys
 from functools import lru_cache
 from pathlib import Path
 
+PJ_PINK = (255, 133, 133)
+
 @lru_cache(maxsize=1)
 def get_project_root() -> Path:
     """

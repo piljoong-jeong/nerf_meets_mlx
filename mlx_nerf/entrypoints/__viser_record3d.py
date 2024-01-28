@@ -8,7 +8,7 @@ import viser.extras
 import viser.transforms as tf
 from tqdm.auto import tqdm
 
-from this_project import get_project_root
+from this_project import get_project_root, PJ_PINK
 
 def init_gui(server: viser.ViserServer, **config) -> None:
 
@@ -109,13 +109,13 @@ def main(
 
 
     server.configure_theme(
-        # titlebar_content="NeRF using MLX",
-        # control_layout="fixed",
-        # control_width="medium",
+        # titlebar_content="NeRF using MLX", # FIXME: this results blank page
+        control_layout="fixed",
+        control_width="medium",
         dark_mode=True,
-        # show_logo=True,
-        # show_share_button=True,
-        brand_color=(255, 133, 133)
+        show_logo=False,
+        show_share_button=False,
+        brand_color=PJ_PINK
     )
 
     while(True):
