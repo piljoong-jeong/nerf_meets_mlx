@@ -11,5 +11,5 @@ from mlx_nerf import entrypoints
 if __name__ == "__main__":
     tyro.cli(
         # entrypoints.viser_record3d
-        entrypoints.viser_image
+        entrypoints.viser_image_learning
     )
