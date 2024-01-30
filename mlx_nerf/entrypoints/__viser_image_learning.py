@@ -4,6 +4,7 @@ from typing import List
 
 import imageio.v3 as imageio
 import numpy as onp
+import mlx.core as mx
 import viser
 import viser.extras
 import viser.transforms as tf
@@ -65,16 +66,12 @@ def main(
         position=(4.0, 4.0, 0.0),
     )
 
-    pred = onp.random.randint(
-        0,
-        256,
-        size=(400, 400, 3),
-        dtype=onp.uint8,
-    )
+    
+    pred = mx.random.randint(0, 256, (400, 400, 3), dtype=mx.uint8)
     while True:
         server.add_image(
             "/pred",
-            pred,
+            onp.array(pred, copy=False), # NOTE: view
             4.0,
             4.0,
             format="png", # NOTE: `jpeg` gives strangely stretched image
