@@ -13,24 +13,20 @@ from this_project import get_project_root, PJ_PINK
 
 def init_gui(server: viser.ViserServer, **config) -> None:
 
-    num_frames = config.get("num_frames", 1)
-    fps = config.get("fps", 1)
+    num_frames = config.get("num_frames", 10000)
 
     with server.add_gui_folder("Playback"):
-        gui_timestep = server.add_gui_slider(
-            "Timestep",
+        gui_slider_iterations = server.add_gui_slider(
+            "# Iterations",
             min=0,
             max=num_frames - 1,
             step=1,
-            initial_value=0,
-            disabled=True,
+            initial_value=1000,
+            disabled=False,
         )
-        gui_next_frame = server.add_gui_button("Next Frame", disabled=True)
-        gui_prev_frame = server.add_gui_button("Prev Frame", disabled=True)
-        gui_playing = server.add_gui_checkbox("Playing", True)
-        gui_framerate = server.add_gui_slider(
-            "FPS", min=1, max=60, step=1, initial_value=fps
-        )
+        gui_btn_start = server.add_gui_button("Start Learning", disabled=True)
+        
+        
 
     server.configure_theme(
         # titlebar_content="NeRF using MLX", # FIXME: this results blank page
