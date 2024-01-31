@@ -11,6 +11,7 @@ import viser.transforms as tf
 from tqdm.auto import tqdm
 
 from this_project import get_project_root, PJ_PINK
+from mlx_nerf.models import embedding
 
 def init_gui(server: viser.ViserServer, **config) -> None:
 
@@ -68,6 +69,15 @@ def main(
 
     
     pred = mx.random.randint(0, 256, (400, 400, 3), dtype=mx.uint8)
+    embed, out_dim = embedding.get_embedder(10)
+    input = mx.zeros(3)
+    output = embed(input)
+    print(f"[DEBUG] {input=}")
+    print(f"[DEBUG] {input.shape=}")
+    print(f"[DEBUG] {output=}")
+    print(f"[DEBUG] {output.shape=}")
+
+
     while True:
         server.add_image(
             "/pred",
