@@ -50,16 +50,16 @@ class Embedder:
             ], axis=-1
         )
     
-def get_embedder(L):
+def get_embedder(n_freqs: int, /, n_input_dims: int = 3):
 
-    if L == -1:
+    if n_freqs == -1:
         return nn.Identity(), 3
     
     embed_kwargs = {
         "include_input": True, 
         "input_dims": 3, 
-        "max_freq_log2": L-1, 
-        "num_freqs": L, 
+        "max_freq_log2": n_freqs-1, 
+        "num_freqs": n_freqs, 
         "log_sampling": True, 
         "periodic_funcs": [mx.sin, mx.cos],
     }

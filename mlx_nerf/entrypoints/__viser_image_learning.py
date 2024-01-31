@@ -69,8 +69,11 @@ def main(
 
     
     pred = mx.random.randint(0, 256, (400, 400, 3), dtype=mx.uint8)
-    embed, out_dim = embedding.get_embedder(10)
-    input = mx.zeros(3)
+
+    # NOTE: embedding func test
+    N_INPUT_DIMS = 2
+    embed, out_dim = embedding.get_embedder(10, n_input_dims=N_INPUT_DIMS)
+    input = mx.zeros(N_INPUT_DIMS)
     output = embed(input)
     print(f"[DEBUG] {input=}")
     print(f"[DEBUG] {input.shape=}")
