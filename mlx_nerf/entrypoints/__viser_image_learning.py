@@ -57,9 +57,11 @@ def main(
         server, 
     )
 
+
+    img_gt = mx.array(imageio.imread(str(path_img := path_assets / "images/albert.jpg")))
     server.add_image(
         "/gt",
-        imageio.imread(str(path_img := path_assets / "images/albert.jpg")),
+        onp.array(img_gt, copy=False),
         4.0,
         4.0,
         format="png", # NOTE: `jpeg` gives strangely stretched image
@@ -79,6 +81,9 @@ def main(
     print(f"[DEBUG] {input.shape=}")
     print(f"[DEBUG] {output=}")
     print(f"[DEBUG] {output.shape=}")
+
+    # NOTE: NeRF
+    
 
 
     while True:
@@ -100,4 +105,6 @@ def main(
         - (augmented i.e., encoded sample positions, pixel color) => MLP
         - `mlx`-dependent optimization implementations (say, `.eval()`?)
         """
+
+
         time.sleep(0.1)
