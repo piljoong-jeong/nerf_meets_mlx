@@ -10,7 +10,7 @@ class NeRF(nn.Module):
         channel_input_views=3, 
         channel_output=4,
         list_skip_connection_layers=[4], 
-        is_use_view_directions=False, # FIXME: deprecate; default option after all
+        is_use_view_directions=False, # NOTE: used when no views are given (say, image evaluation)
     ):
         super().__init__()
 

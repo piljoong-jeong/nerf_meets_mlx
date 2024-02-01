@@ -5,6 +5,7 @@ from typing import List
 import imageio.v3 as imageio
 import numpy as onp
 import mlx.core as mx
+import mlx.nn as nn
 import viser
 import viser.extras
 import viser.transforms as tf
@@ -12,6 +13,8 @@ from tqdm.auto import tqdm
 
 from this_project import get_project_root, PJ_PINK
 from mlx_nerf.models import embedding
+from mlx_nerf.models.NeRF import NeRF
+from mlx_nerf.ops.metric import MSE
 
 def init_gui(server: viser.ViserServer, **config) -> None:
 
@@ -83,7 +86,20 @@ def main(
     print(f"[DEBUG] {output.shape=}")
 
     # NOTE: NeRF
-    
+    model = NeRF(
+        channel_input=2, # NOTE: pixel position 
+        channel_input_views=0, 
+        channel_output=1, 
+        is_use_view_directions=False, 
+    )
+    print(f"[DEBUG] evaluating {model=} ...")
+    mx.eval(model.parameters())
+    print(f"[DEBUG] evaluating {model=} ... done.")
+
+    def mlx_mse(model, x, y):
+        return mx.mean((model(x) - y) ** 2)
+    loss_and_grad_fn = nn.value_and_grad(model, mlx_mse)
+
 
 
     while True:
@@ -106,5 +122,6 @@ def main(
         - `mlx`-dependent optimization implementations (say, `.eval()`?)
         """
 
+        loss, grads = loss_and_grad_fn(model, ) # TODO
 
         time.sleep(0.1)
