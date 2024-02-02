@@ -102,6 +102,7 @@ def main(
 
 
 
+
     while True:
         server.add_image(
             "/pred",
