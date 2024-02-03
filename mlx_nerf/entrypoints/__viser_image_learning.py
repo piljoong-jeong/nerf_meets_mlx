@@ -45,7 +45,12 @@ def init_gui(server: viser.ViserServer, **config) -> None:
 
     return
 
-
+# FIXME
+def batch_iterate(batch_size, X, y):
+    perm = mx.array(onp.random.permutation(y.size))
+    for s in range(0, y.size, batch_size):
+        ids = perm[s : s + batch_size]
+        yield X[ids], y[ids]
 
 def main(
     path_assets: Path = get_project_root() / "assets",
