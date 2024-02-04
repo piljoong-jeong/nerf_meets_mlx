@@ -85,10 +85,10 @@ def main(
     embed, out_dim = embedding.get_embedder(10, n_input_dims=N_INPUT_DIMS)
     input = mx.zeros(N_INPUT_DIMS)
     output = embed(input)
-    print(f"[DEBUG] {input=}")
-    print(f"[DEBUG] {input.shape=}")
-    print(f"[DEBUG] {output=}")
-    print(f"[DEBUG] {output.shape=}")
+    #print(f"[DEBUG] {input=}")
+    #print(f"[DEBUG] {input.shape=}")
+    #print(f"[DEBUG] {output=}")
+    #print(f"[DEBUG] {output.shape=}")
 
     # NOTE: NeRF
     model = NeRF(
@@ -97,9 +97,9 @@ def main(
         channel_output=1, 
         is_use_view_directions=False, 
     )
-    print(f"[DEBUG] evaluating {model=} ...")
+    # print(f"[DEBUG] evaluating {model=} ...")
     mx.eval(model.parameters())
-    print(f"[DEBUG] evaluating {model=} ... done.")
+    # print(f"[DEBUG] evaluating {model=} ... done.")
 
     def mlx_mse(model, x, y):
         return mx.mean((model(x) - y) ** 2)
@@ -107,6 +107,33 @@ def main(
 
 
 
+    X = onp.meshgrid(
+        
+        onp.arange(0, img_gt.shape[0]), 
+        onp.arange(0, img_gt.shape[1]), 
+        indexing="ij"
+    ) # NOTE: `list`
+    print(f"[DEBUG] {len(X)=} {len(X[0])=} {len(X[1])=}")
+    print(f"{type(X)=}")
+    print(type(X[0]))
+    print(X[0])
+    print(X[0].shape)
+    print(X[1].shape)
+    print(X[0][0][0], X[1][0][0])
+    print(X[0][img_gt.shape[0]-1][img_gt.shape[1]-1], X[1][img_gt.shape[0]-1][img_gt.shape[1]-1])
+    
+    # TODO: convert all `np.ndarray`s into `mx.array`
+    X[0] = mx.array(X[0])
+    X[1] = mx.array(X[1])
+    print(type(X[0]))
+    print(X[0])
+    print(X[0].shape)
+    print(X[1].shape)
+    print(X[0][0][0], X[1][0][0])
+    print(X[0][img_gt.shape[0]-1][img_gt.shape[1]-1], X[1][img_gt.shape[0]-1][img_gt.shape[1]-1])
+    exit()
+
+    exit()
 
     while True:
         server.add_image(
