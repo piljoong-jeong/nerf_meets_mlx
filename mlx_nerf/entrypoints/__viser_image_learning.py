@@ -67,6 +67,8 @@ def main(
 
 
     img_gt = mx.array(imageio.imread(str(path_img := path_assets / "images/albert.jpg")))
+    img_gt = img_gt.astype(mx.float32) / 255.0
+    img_gt = mx.repeat(img_gt[..., None], repeats=3, axis=-1)
     server.add_image(
         "/gt",
         onp.array(img_gt, copy=False),
@@ -78,7 +80,9 @@ def main(
     )
 
     
-    pred = mx.random.randint(0, 256, (400, 400, 3), dtype=mx.uint8)
+    pred = mx.random.randint(0, 256, (400, 400, 1), dtype=mx.uint8)
+    pred = pred.astype(mx.float32) / 255.0
+    pred = mx.repeat(pred, repeats=3, axis=-1)
 
     # NOTE: embedding func test
     N_INPUT_DIMS = 2
