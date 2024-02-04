@@ -92,7 +92,7 @@ def main(
 
     # NOTE: NeRF
     model = NeRF(
-        channel_input=2, # NOTE: pixel position 
+        channel_input=N_INPUT_DIMS, # NOTE: pixel position 
         channel_input_views=0, 
         channel_output=1, 
         is_use_view_directions=False, 
