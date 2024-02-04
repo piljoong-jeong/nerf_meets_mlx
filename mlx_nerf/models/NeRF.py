@@ -46,11 +46,15 @@ class NeRF(nn.Module):
         self, 
         x # NOTE: encoded
     ):
-        input_pos, input_dir = mx.split(
-            x, 
-            [self.channel_input_pos, self.channel_input_dir], 
-            dim=-1
-        )
+
+        if self.is_use_view_directions:
+            input_pos, input_dir = mx.split(
+                x, 
+                indices_or_sections=[self.channel_input_pos, self.channel_input_dir], 
+                axis=-1
+            )
+        else:
+            input_pos = x
 
         # NOTE: forwarding positions
         h = input_pos

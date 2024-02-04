@@ -152,6 +152,11 @@ def main(
     print(f"{pred[X[0][0], X[0][1]]=}")
     print(f"{img_gt[X[0][0], X[0][1]]=}")
     
+    test_embedded_ppos = embed(X[0])
+    print(f"{test_embedded_ppos=}")
+    print(f"{test_embedded_ppos.shape=}")
+    
+    print(f"{model.forward(X[0])=}")
 
     while True:
         server.add_image(
