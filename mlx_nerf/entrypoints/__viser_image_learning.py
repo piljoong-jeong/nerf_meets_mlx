@@ -135,9 +135,23 @@ def main(
     print(X[1].shape)
     print(X[0][0][0], X[1][0][0])
     print(X[0][img_gt.shape[0]-1][img_gt.shape[1]-1], X[1][img_gt.shape[0]-1][img_gt.shape[1]-1])
-    exit()
+    
+    # TODO: stack meshgrids
+    X = mx.stack(X, axis=-1)
+    print(f"{X.shape=}")
+    
+    # TODO: reshape, now [H, W] has been flatten
+    X = mx.reshape(X, [-1, 2])
+    print(f"{X.shape=}") 
 
-    exit()
+    #print(f"{pred[X[0]]=}")
+    print(f"{X[0]=}") # (2, )
+    print(f"{pred.shape=}") # [H=400, W=400, C=3]
+    print(f"{pred[X[0]].shape=}") # FIXME: (2, 400, 3) ???
+    print(f"{pred[X[0][0], X[0][1]].shape=}") # (3, )
+    print(f"{pred[X[0][0], X[0][1]]=}")
+    print(f"{img_gt[X[0][0], X[0][1]]=}")
+    
 
     while True:
         server.add_image(
