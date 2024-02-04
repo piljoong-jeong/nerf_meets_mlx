@@ -4,8 +4,8 @@ from typing import Any
 import mlx.core as mx
 import mlx.nn as nn
 
-@mx.no_grad() # FIXME
-def loss_to_PSNR(loss: mx.Tensor):
+# @mx.no_grad() # FIXME
+def loss_to_PSNR(loss: mx.array):
 
     return NotImplementedError
 
