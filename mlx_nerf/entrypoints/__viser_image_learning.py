@@ -89,10 +89,6 @@ def main(
     embed, out_dim = embedding.get_embedder(10, n_input_dims=N_INPUT_DIMS)
     input = mx.zeros(N_INPUT_DIMS)
     output = embed(input)
-    #print(f"[DEBUG] {input=}")
-    #print(f"[DEBUG] {input.shape=}")
-    #print(f"[DEBUG] {output=}")
-    #print(f"[DEBUG] {output.shape=}")
 
     # NOTE: NeRF
     model = NeRF(
@@ -101,9 +97,7 @@ def main(
         channel_output=1, 
         is_use_view_directions=False, 
     )
-    # print(f"[DEBUG] evaluating {model=} ...")
     mx.eval(model.parameters())
-    # print(f"[DEBUG] evaluating {model=} ... done.")
 
     def mlx_mse(model, x, y):
         return mx.mean((model(x) - y) ** 2)
