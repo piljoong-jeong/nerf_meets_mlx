@@ -6,6 +6,7 @@ import imageio.v3 as imageio
 import numpy as onp
 import mlx.core as mx
 import mlx.nn as nn
+import mlx.optimizers as optim
 import viser
 import viser.extras
 import viser.transforms as tf
@@ -100,7 +101,7 @@ def main(
     mx.eval(model.parameters())
 
     def mlx_mse(model, x, y):
-        return mx.mean((model(x) - y) ** 2)
+        return mx.mean((model.forward(x) - y) ** 2)
     loss_and_grad_fn = nn.value_and_grad(model, mlx_mse)
 
 
@@ -152,6 +153,8 @@ def main(
     
     print(f"{model.forward(X[0])=}")
 
+    optimizer = optim.SGD(learning_rate=0.999)
+
     while True:
         server.add_image(
             "/pred",
@@ -172,6 +175,9 @@ def main(
         - `mlx`-dependent optimization implementations (say, `.eval()`?)
         """
 
-        loss, grads = loss_and_grad_fn(model, ) # TODO
+        for X, y in batch_iterate(batch_size:=1, pred, img_gt):
+            loss, grads = loss_and_grad_fn(model, X, y)
+            optimizer.update(model, grads)
+            mx.eval(model.parameters(), optimizer.state)
 
         time.sleep(0.1)
