@@ -81,8 +81,8 @@ def main(
     )
 
     
-    pred = mx.random.randint(0, 256, (400, 400, 1), dtype=mx.uint8)
-    pred = pred.astype(mx.float32) / 255.0
+    img_pred = mx.random.randint(0, 256, img_gt.shape, dtype=mx.uint8)
+    img_pred = img_pred.astype(mx.float32) / 255.0
     # pred = mx.repeat(pred, repeats=3, axis=-1)
 
     # NOTE: embedding func test
@@ -128,7 +128,7 @@ def main(
     while True:
         server.add_image(
             "/pred",
-            onp.array(mx.repeat(pred, repeats=3, axis=-1), copy=False), # NOTE: view
+            onp.array(mx.repeat(img_pred, repeats=3, axis=-1), copy=False), # NOTE: view
             4.0,
             4.0,
             format="png", # NOTE: `jpeg` gives strangely stretched image
@@ -153,8 +153,12 @@ def main(
         #     optimizer.update(model, grads)
         #     mx.eval(model.parameters(), optimizer.state)
 
-        # loss, grads = loss_and_grad_fn(model, pred, img_gt)
+
+        # print(f"{img_pred.shape=}")
+        # print(f"{img_gt.shape=}")
+        # loss, grads = loss_and_grad_fn(model, img_pred, img_gt)
         # optimizer.update(model, grads)
         # mx.eval(model.parameters(), optimizer.state)
+        # exit()
 
         time.sleep(0.1)
