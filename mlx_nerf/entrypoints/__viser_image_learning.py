@@ -69,10 +69,10 @@ def main(
 
     img_gt = mx.array(imageio.imread(str(path_img := path_assets / "images/albert.jpg")))
     img_gt = img_gt.astype(mx.float32) / 255.0
-    img_gt = mx.repeat(img_gt[..., None], repeats=3, axis=-1)
+    # img_gt = mx.repeat(img_gt[..., None], repeats=3, axis=-1)
     server.add_image(
         "/gt",
-        onp.array(img_gt, copy=False),
+        onp.array(mx.repeat(img_gt[..., None], repeats=3, axis=-1), copy=False),
         4.0,
         4.0,
         format="png", # NOTE: `jpeg` gives strangely stretched image
@@ -83,7 +83,7 @@ def main(
     
     pred = mx.random.randint(0, 256, (400, 400, 1), dtype=mx.uint8)
     pred = pred.astype(mx.float32) / 255.0
-    pred = mx.repeat(pred, repeats=3, axis=-1)
+    # pred = mx.repeat(pred, repeats=3, axis=-1)
 
     # NOTE: embedding func test
     N_INPUT_DIMS = 2
@@ -106,59 +106,29 @@ def main(
 
 
 
-    X = onp.meshgrid(
+    coords = onp.meshgrid(
         
         onp.arange(0, img_gt.shape[0]), 
         onp.arange(0, img_gt.shape[1]), 
         indexing="ij"
     ) # NOTE: `list`
-    print(f"[DEBUG] {len(X)=} {len(X[0])=} {len(X[1])=}")
-    print(f"{type(X)=}")
-    print(type(X[0]))
-    print(X[0])
-    print(X[0].shape)
-    print(X[1].shape)
-    print(X[0][0][0], X[1][0][0])
-    print(X[0][img_gt.shape[0]-1][img_gt.shape[1]-1], X[1][img_gt.shape[0]-1][img_gt.shape[1]-1])
     
     # TODO: convert all `np.ndarray`s into `mx.array`
-    X[0] = mx.array(X[0])
-    X[1] = mx.array(X[1])
-    print(type(X[0]))
-    print(X[0])
-    print(X[0].shape)
-    print(X[1].shape)
-    print(X[0][0][0], X[1][0][0])
-    print(X[0][img_gt.shape[0]-1][img_gt.shape[1]-1], X[1][img_gt.shape[0]-1][img_gt.shape[1]-1])
+    coords[0] = mx.array(coords[0])
+    coords[1] = mx.array(coords[1])
     
     # TODO: stack meshgrids
-    X = mx.stack(X, axis=-1)
-    print(f"{X.shape=}")
+    coords = mx.stack(coords, axis=-1)
     
     # TODO: reshape, now [H, W] has been flatten
-    X = mx.reshape(X, [-1, 2])
-    print(f"{X.shape=}") 
-
-    #print(f"{pred[X[0]]=}")
-    print(f"{X[0]=}") # (2, )
-    print(f"{pred.shape=}") # [H=400, W=400, C=3]
-    print(f"{pred[X[0]].shape=}") # FIXME: (2, 400, 3) ???
-    print(f"{pred[X[0][0], X[0][1]].shape=}") # (3, )
-    print(f"{pred[X[0][0], X[0][1]]=}")
-    print(f"{img_gt[X[0][0], X[0][1]]=}")
+    coords = mx.reshape(coords, [-1, 2])
     
-    test_embedded_ppos = embed(X[0])
-    print(f"{test_embedded_ppos=}")
-    print(f"{test_embedded_ppos.shape=}")
-    
-    print(f"{model.forward(X[0])=}")
-
     optimizer = optim.SGD(learning_rate=0.999)
 
     while True:
         server.add_image(
             "/pred",
-            onp.array(pred, copy=False), # NOTE: view
+            onp.array(mx.repeat(pred, repeats=3, axis=-1), copy=False), # NOTE: view
             4.0,
             4.0,
             format="png", # NOTE: `jpeg` gives strangely stretched image
@@ -175,9 +145,16 @@ def main(
         - `mlx`-dependent optimization implementations (say, `.eval()`?)
         """
 
-        for X, y in batch_iterate(batch_size:=1, pred, img_gt):
-            loss, grads = loss_and_grad_fn(model, X, y)
-            optimizer.update(model, grads)
-            mx.eval(model.parameters(), optimizer.state)
+        # for coords, y in batch_iterate(batch_size:=1, pred, img_gt):
+        #     print(f"[DEBUG] {coords.shape=}")
+        #     print(f"[DEBUG] {y.shape=}")
+        #     exit()
+        #     loss, grads = loss_and_grad_fn(model, coords, y)
+        #     optimizer.update(model, grads)
+        #     mx.eval(model.parameters(), optimizer.state)
+
+        # loss, grads = loss_and_grad_fn(model, pred, img_gt)
+        # optimizer.update(model, grads)
+        # mx.eval(model.parameters(), optimizer.state)
 
         time.sleep(0.1)
