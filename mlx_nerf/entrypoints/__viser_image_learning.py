@@ -47,11 +47,43 @@ def init_gui(server: viser.ViserServer, **config) -> None:
     return
 
 # FIXME
-def batch_iterate(batch_size, X, y):
-    perm = mx.array(onp.random.permutation(y.size))
+def batch_iterate(batch_size: int, X: mx.array, y: mx.array):
+    
+    assert X.shape == y.shape
+    
+    coords = onp.meshgrid(
+        
+        onp.arange(0, y.shape[0]), 
+        onp.arange(0, y.shape[1]), 
+        indexing="ij"
+    ) # NOTE: `list`
+    
+    # TODO: convert all `np.ndarray`s into `mx.array`
+    coords[0] = mx.array(coords[0])
+    coords[1] = mx.array(coords[1])
+    
+    # TODO: stack meshgrids
+    coords = mx.stack(coords, axis=-1)
+    
+    # TODO: reshape, now [H, W] has been flatten
+    coords = mx.reshape(coords, [-1, 2])
+    
+    choice = mx.array(onp.random.choice(coords.shape[0], size=[coords.shape[0]], replace=False)) # NOTE: [H*W]
+    
+    print(f"{X.shape=}")
+    
+
     for s in range(0, y.size, batch_size):
-        ids = perm[s : s + batch_size]
-        yield X[ids], y[ids]
+        ids = choice[s : s + batch_size]
+        # print(f"{coords[ids]=}")
+        # print(f"{coords[ids].shape=}")
+        # print(f"{X[coords[ids]]=} {X[coords[ids]].shape=}")
+        # print(f"{y[coords[ids]]=} {y[coords[ids]].shape=}")
+        # exit()
+        
+        yield X[coords[ids][:, 0], coords[ids][:, 1]], y[coords[ids][:, 0], coords[ids][:, 1]]
+
+        
 
 def main(
     path_assets: Path = get_project_root() / "assets",
@@ -106,25 +138,12 @@ def main(
 
 
 
-    coords = onp.meshgrid(
-        
-        onp.arange(0, img_gt.shape[0]), 
-        onp.arange(0, img_gt.shape[1]), 
-        indexing="ij"
-    ) # NOTE: `list`
     
-    # TODO: convert all `np.ndarray`s into `mx.array`
-    coords[0] = mx.array(coords[0])
-    coords[1] = mx.array(coords[1])
     
-    # TODO: stack meshgrids
-    coords = mx.stack(coords, axis=-1)
-    
-    # TODO: reshape, now [H, W] has been flatten
-    coords = mx.reshape(coords, [-1, 2])
-    
-    optimizer = optim.SGD(learning_rate=0.999)
+    optimizer = optim.SGD(learning_rate=0.1)
 
+    idx_iter = 0
+    
     while True:
         server.add_image(
             "/pred",
@@ -145,20 +164,20 @@ def main(
         - `mlx`-dependent optimization implementations (say, `.eval()`?)
         """
 
-        # for coords, y in batch_iterate(batch_size:=1, pred, img_gt):
-        #     print(f"[DEBUG] {coords.shape=}")
-        #     print(f"[DEBUG] {y.shape=}")
-        #     exit()
-        #     loss, grads = loss_and_grad_fn(model, coords, y)
-        #     optimizer.update(model, grads)
-        #     mx.eval(model.parameters(), optimizer.state)
+        loss_mse = 0.0
+        n_batch_iterate=0
+        for X, y in batch_iterate(batch_size:=2, img_pred, img_gt): # FIXME: problem in batching
+            
+            loss, grads = loss_and_grad_fn(model, X, y)
+            optimizer.update(model, grads)
+            mx.eval(model.parameters(), optimizer.state)
+            loss_mse += loss
+
+            print(f"[DEBUG] #n_batch_iter={n_batch_iterate} ... \t loss = {loss}")
+            n_batch_iterate += 1
 
 
-        # print(f"{img_pred.shape=}")
-        # print(f"{img_gt.shape=}")
-        # loss, grads = loss_and_grad_fn(model, img_pred, img_gt)
-        # optimizer.update(model, grads)
-        # mx.eval(model.parameters(), optimizer.state)
-        # exit()
+        print(f"[DEBUG] #iter={idx_iter} ... \t loss = {loss_mse / n_batch_iterate}")
 
+        idx_iter += 1
         time.sleep(0.1)
