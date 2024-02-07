@@ -1,6 +1,7 @@
 import time
 from pathlib import Path
 from typing import List
+from PIL import Image
 
 import imageio.v3 as imageio
 import numpy as onp
@@ -98,7 +99,9 @@ def main(
     )
 
 
-    img_gt = mx.array(imageio.imread(str(path_img := path_assets / "images/albert.jpg")))
+    img_gt = imageio.imread(str(path_img := path_assets / "images/albert.jpg"))
+    img_gt = Image.fromarray(img_gt).resize((400, 400))
+    img_gt = mx.array(onp.asarray(img_gt))
     img_gt = img_gt.astype(mx.float32) / 255.0
     # img_gt = mx.repeat(img_gt[..., None], repeats=3, axis=-1)
     server.add_image(
@@ -171,19 +174,19 @@ def main(
 
         loss_mse = 0.0
         n_batch_iterate=0
-        for X, y in batch_iterate(batch_size:=64, img_pred, img_gt): # FIXME: problem in batching
+        # for X, y in batch_iterate(batch_size:=64, img_pred, img_gt): # FIXME: problem in batching
             
-            loss, grads = loss_and_grad_fn(model, X, y)
-            optimizer.update(model, grads)
-            mx.eval(model.parameters(), optimizer.state)
-            loss_mse += loss
+        #     loss, grads = loss_and_grad_fn(model, X, y)
+        #     optimizer.update(model, grads)
+        #     mx.eval(model.parameters(), optimizer.state)
+        #     loss_mse += loss
 
-            # print(f"[DEBUG] #n_batch_iter={n_batch_iterate} ... \t loss = {loss}")
-            n_batch_iterate += 1
+        #     # print(f"[DEBUG] #n_batch_iter={n_batch_iterate} ... \t loss = {loss}")
+        #     n_batch_iterate += 1
 
 
-        print(f"[DEBUG] #iter={idx_iter} ... \t loss = {loss_mse / n_batch_iterate}")
-        exit()
+        # print(f"[DEBUG] #iter={idx_iter} ... \t loss = {loss_mse / n_batch_iterate}")
+        # exit()
 
 
         idx_iter += 1
