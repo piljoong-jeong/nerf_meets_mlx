@@ -105,7 +105,6 @@ def main(
     img_gt = Image.fromarray(img_gt).resize((400, 400))
     img_gt = mx.array(onp.asarray(img_gt))
     img_gt = img_gt.astype(mx.float32) / 255.0
-    # img_gt = mx.repeat(img_gt[..., None], repeats=3, axis=-1)
     server.add_image(
         "/gt",
         onp.array(mx.repeat(img_gt[..., None], repeats=3, axis=-1), copy=False),
@@ -142,6 +141,13 @@ def main(
         
         x_flat = mx.reshape(x, [-1, x.shape[-1]])
         x_embedded = embed(x_flat)
+
+        # NOTE: raw pixel position may cause optimization failure, which produces NaN
+        # NOTE: hence we divide original pixel positions by its shape per axis
+        if 2 == N_INPUT_DIMS:
+            x_embedded[..., 0] /= img_gt.shape[0]
+            x_embedded[..., 1] /= img_gt.shape[1]
+        
         
         return mx.mean((model.forward(x_embedded) - y) ** 2)
     loss_and_grad_fn = nn.value_and_grad(model, mlx_mse)
@@ -152,8 +158,7 @@ def main(
     
     optimizer = optim.SGD(learning_rate=0.01)
 
-    idx_iter = 0
-    
+    idx_iter = 0    
     while True:
         server.add_image(
             "/pred",
@@ -176,19 +181,31 @@ def main(
 
         loss_mse = 0.0
         n_batch_iterate=0
-        # for X, y in batch_iterate(batch_size:=64, img_pred, img_gt): # FIXME: problem in batching
+        for X, y in batch_iterate(batch_size:=32*1024, img_pred, img_gt): # FIXME: problem in batching
             
-        #     loss, grads = loss_and_grad_fn(model, X, y)
-        #     optimizer.update(model, grads)
-        #     mx.eval(model.parameters(), optimizer.state)
-        #     loss_mse += loss
+            loss, grads = loss_and_grad_fn(model, X, y)
+            optimizer.update(model, grads)
+            mx.eval(model.parameters(), optimizer.state)
 
-        #     # print(f"[DEBUG] #n_batch_iter={n_batch_iterate} ... \t loss = {loss}")
-        #     n_batch_iterate += 1
+            # if mx.isnan(loss):
+            #     print(f"[ERROR] NaN detected! {n_batch_iterate=}")
+            #     print(f"\t{X=}")
+            #     X_embedded = embed(mx.reshape(X, [-1, X.shape[-1]]))
+            #     print(f"\t{X_embedded=}")
+            #     print(f"\t{model.forward(X_embedded)=}")
+            #     print(f"\t{y=}")
+            #     exit()
+
+            loss_mse += loss
+
+            # print(f"[DEBUG] #n_batch_iter={n_batch_iterate} ... \t loss = {loss}")
+            n_batch_iterate += 1
 
 
-        # print(f"[DEBUG] #iter={idx_iter} ... \t loss = {loss_mse / n_batch_iterate}")
-        # exit()
+        print(f"[DEBUG] #iter={idx_iter} ... \t loss = {loss_mse / n_batch_iterate}")
+        
+        if idx_iter == 100:
+            exit()
 
 
         idx_iter += 1
