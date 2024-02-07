@@ -37,7 +37,7 @@ class NeRF(nn.Module):
             self.feature_linear = nn.Linear(width_layers, width_layers) # NOTE: last layer
             self.alpha_linear = nn.Linear(width_layers, 1)
             self.rgb_linear = nn.Linear(width_layers//2, 3)
-        else: # FIXME: deprecate
+        else: # NOTE: e.g., image pixel learning
             self.output_linear = nn.Linear(width_layers, channel_output)
 
         return

@@ -46,7 +46,6 @@ def init_gui(server: viser.ViserServer, **config) -> None:
 
     return
 
-# FIXME
 def batch_iterate(batch_size: int, X: mx.array, y: mx.array):
     
     assert X.shape == y.shape
@@ -69,19 +68,19 @@ def batch_iterate(batch_size: int, X: mx.array, y: mx.array):
     coords = mx.reshape(coords, [-1, 2])
     
     choice = mx.array(onp.random.choice(coords.shape[0], size=[coords.shape[0]], replace=False)) # NOTE: [H*W]
-    
-    print(f"{X.shape=}")
-    
-
     for s in range(0, y.size, batch_size):
-        ids = choice[s : s + batch_size]
-        # print(f"{coords[ids]=}")
-        # print(f"{coords[ids].shape=}")
-        # print(f"{X[coords[ids]]=} {X[coords[ids]].shape=}")
-        # print(f"{y[coords[ids]]=} {y[coords[ids]].shape=}")
-        # exit()
+        selected = choice[s : s + batch_size]
         
-        yield X[coords[ids][:, 0], coords[ids][:, 1]], y[coords[ids][:, 0], coords[ids][:, 1]]
+        # FIXME: those are pixel value, position should be returned
+        # X_batch = X[coords[selected][:, 0], coords[selected][:, 1]]
+        # y_batch = y[coords[selected][:, 0], coords[selected][:, 1]]
+        X_batch = coords[selected] # X[coords[selected]]
+        y_batch = y[coords[selected][:, 0], coords[selected][:, 1]]
+
+        yield (
+            X_batch, 
+            y_batch
+        )
 
         
 
@@ -122,10 +121,12 @@ def main(
     embed, out_dim = embedding.get_embedder(10, n_input_dims=N_INPUT_DIMS)
     input = mx.zeros(N_INPUT_DIMS)
     output = embed(input)
+    print(f"[DEBUG] {out_dim=}")
+    print(f"[DEBUG] {output.shape=}")
 
     # NOTE: NeRF
     model = NeRF(
-        channel_input=N_INPUT_DIMS, # NOTE: pixel position 
+        channel_input=out_dim, # NOTE: embedded pixel position 
         channel_input_views=0, 
         channel_output=1, 
         is_use_view_directions=False, 
@@ -133,14 +134,18 @@ def main(
     mx.eval(model.parameters())
 
     def mlx_mse(model, x, y):
-        return mx.mean((model.forward(x) - y) ** 2)
+        
+        x_flat = mx.reshape(x, [-1, x.shape[-1]])
+        x_embedded = embed(x_flat)
+        
+        return mx.mean((model.forward(x_embedded) - y) ** 2)
     loss_and_grad_fn = nn.value_and_grad(model, mlx_mse)
 
 
 
     
     
-    optimizer = optim.SGD(learning_rate=0.1)
+    optimizer = optim.SGD(learning_rate=0.01)
 
     idx_iter = 0
     
@@ -166,18 +171,20 @@ def main(
 
         loss_mse = 0.0
         n_batch_iterate=0
-        for X, y in batch_iterate(batch_size:=2, img_pred, img_gt): # FIXME: problem in batching
+        for X, y in batch_iterate(batch_size:=64, img_pred, img_gt): # FIXME: problem in batching
             
             loss, grads = loss_and_grad_fn(model, X, y)
             optimizer.update(model, grads)
             mx.eval(model.parameters(), optimizer.state)
             loss_mse += loss
 
-            print(f"[DEBUG] #n_batch_iter={n_batch_iterate} ... \t loss = {loss}")
+            # print(f"[DEBUG] #n_batch_iter={n_batch_iterate} ... \t loss = {loss}")
             n_batch_iterate += 1
 
 
         print(f"[DEBUG] #iter={idx_iter} ... \t loss = {loss_mse / n_batch_iterate}")
+        exit()
+
 
         idx_iter += 1
         time.sleep(0.1)
