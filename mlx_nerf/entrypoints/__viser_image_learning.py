@@ -1,8 +1,11 @@
+import os
 import time
 from pathlib import Path
 from typing import List
 from PIL import Image
 
+import imageio.v2 as imageio
+writer = imageio.get_writer(os.path.join("", f"learning.mp4"), fps=60)
 import imageio.v3 as imageio
 import numpy as onp
 import mlx.core as mx
@@ -49,9 +52,8 @@ def init_gui(server: viser.ViserServer, **config) -> None:
 
     return
 
-def batch_iterate(batch_size: int, X: mx.array, y: mx.array):
+def batch_iterate(batch_size: int, y: mx.array):
     
-    assert X.shape == y.shape
     
     coords = onp.meshgrid(
         
@@ -131,6 +133,7 @@ def main(
         channel_input_views=0, 
         channel_output=1, 
         is_use_view_directions=False, 
+        # n_layers=5, # FIXME: dimension mismatching occurred
     )
     mx.eval(model.parameters())
 
@@ -141,21 +144,28 @@ def main(
 
         # NOTE: raw pixel position may cause optimization failure, which produces NaN
         # NOTE: hence we divide original pixel positions by its shape per axis
-        if 2 == N_INPUT_DIMS:
-            x_embedded[..., 0] /= img_gt.shape[0]
-            x_embedded[..., 1] /= img_gt.shape[1]
+        
+        # NOTE: disabled as we excluded input when dim=2
+        #if 2 == N_INPUT_DIMS:
+        #    x_embedded[..., 0] /= img_gt.shape[0]
+        #    x_embedded[..., 1] /= img_gt.shape[1]
         
         
-        return mx.mean((model.forward(x_embedded) - y) ** 2)
+        mse = mx.mean((model.forward(x_embedded) - y) ** 2)
+        
+        # relative_l2_error = (model.forward(x_embedded))
+
+        return mse
+        
     loss_and_grad_fn = nn.value_and_grad(model, mlx_mse)
 
 
 
     
     
-    # optimizer = optim.SGD(learning_rate=0.001)
-    learning_rate = 0.01# 5e-4
-    optimizer = optim.Adam(learning_rate=learning_rate, betas=(0.9, 0.999))
+    # NOTE: from https://github.com/NVlabs/tiny-cuda-nn/blob/master/data/config.json
+    learning_rate = 1*1e-3
+    optimizer = optim.Adam(learning_rate=learning_rate, betas=(0.9, 0.99))
 
     idx_iter = 0    
 
@@ -185,24 +195,36 @@ def main(
 
         loss_mse = 0.0
         n_batch_iterate=0
-        for X, y in batch_iterate(batch_size:=32*1024, img_pred, img_gt): # FIXME: problem in batching
+        for X, y in batch_iterate(batch_size:=1, img_gt): # FIXME: learning fails when batch_size>1
             
-            loss, grads = loss_and_grad_fn(model, X, y)
+            loss, grads = loss_and_grad_fn(model, X, y) # FIXME: they should be evaluated once all pixels have been inferred            
             optimizer.update(model, grads)
             mx.eval(model.parameters(), optimizer.state)
-
+    
             loss_mse += loss
             n_batch_iterate += 1
 
-            img_pred[X[..., 0], X[..., 1]] = model.forward(embed(mx.reshape(X, [-1, X.shape[-1]])))[0]
+            values = model.forward(embed(mx.reshape(X, [-1, X.shape[-1]])))[0]
+            # print(f"{values=}")
+            # print(f"{img_pred[X[..., 0], X[..., 1]]=}")
+            
+            img_pred[X[..., 0], X[..., 1]] = values
+
+            # break
+
+        
 
 
         print(f"[DEBUG] #iter={idx_iter} ... \t loss = {loss_mse / n_batch_iterate}")
         
-        #new_lrate = learning_rate * (decay_rate ** (idx_iter+1 / decay_steps))
-        #optimizer.learning_rate = new_lrate
+        # new_lrate = learning_rate * (decay_rate ** (idx_iter+1 / decay_steps))
+        # optimizer.learning_rate = new_lrate
 
-        if idx_iter == 100:
+        pixels_np = (onp.array(img_pred, dtype=onp.float32, copy=False) * 255.0).astype(onp.uint8) # [H, W]
+        writer.append_data(pixels_np.transpose())
+
+        if idx_iter == 10:
+            writer.close()
             exit()
 
 
