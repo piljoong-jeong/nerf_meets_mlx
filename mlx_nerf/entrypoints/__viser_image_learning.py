@@ -74,10 +74,7 @@ def batch_iterate(batch_size: int, X: mx.array, y: mx.array):
     for s in range(0, y.size, batch_size):
         selected = choice[s : s + batch_size]
         
-        # FIXME: those are pixel value, position should be returned
-        # X_batch = X[coords[selected][:, 0], coords[selected][:, 1]]
-        # y_batch = y[coords[selected][:, 0], coords[selected][:, 1]]
-        X_batch = coords[selected] # X[coords[selected]]
+        X_batch = coords[selected] 
         y_batch = y[coords[selected][:, 0], coords[selected][:, 1]]
 
         yield (
@@ -102,8 +99,8 @@ def main(
 
 
     img_gt = imageio.imread(str(path_img := path_assets / "images/albert.jpg"))
-    img_gt = Image.fromarray(img_gt).resize((400, 400))
-    img_gt = mx.array(onp.asarray(img_gt))
+    img_gt = onp.asarray(Image.fromarray(img_gt).resize((100, 100)))
+    img_gt = mx.array(img_gt)
     img_gt = img_gt.astype(mx.float32) / 255.0
     server.add_image(
         "/gt",
@@ -116,7 +113,7 @@ def main(
     )
 
     
-    img_pred = mx.random.randint(0, 256, img_gt.shape, dtype=mx.uint8)
+    img_pred = mx.random.randint(255, 256, img_gt.shape, dtype=mx.uint8)
     img_pred = img_pred.astype(mx.float32) / 255.0
     # pred = mx.repeat(pred, repeats=3, axis=-1)
 
@@ -156,9 +153,16 @@ def main(
 
     
     
-    optimizer = optim.SGD(learning_rate=0.01)
+    # optimizer = optim.SGD(learning_rate=0.001)
+    learning_rate = 0.01# 5e-4
+    optimizer = optim.Adam(learning_rate=learning_rate, betas=(0.9, 0.999))
 
     idx_iter = 0    
+
+    decay_rate = 0.1
+    decay_steps = (lrate_decay := 250) * 1000
+    
+
     while True:
         server.add_image(
             "/pred",
@@ -187,23 +191,17 @@ def main(
             optimizer.update(model, grads)
             mx.eval(model.parameters(), optimizer.state)
 
-            # if mx.isnan(loss):
-            #     print(f"[ERROR] NaN detected! {n_batch_iterate=}")
-            #     print(f"\t{X=}")
-            #     X_embedded = embed(mx.reshape(X, [-1, X.shape[-1]]))
-            #     print(f"\t{X_embedded=}")
-            #     print(f"\t{model.forward(X_embedded)=}")
-            #     print(f"\t{y=}")
-            #     exit()
-
             loss_mse += loss
-
-            # print(f"[DEBUG] #n_batch_iter={n_batch_iterate} ... \t loss = {loss}")
             n_batch_iterate += 1
+
+            img_pred[X[..., 0], X[..., 1]] = model.forward(embed(mx.reshape(X, [-1, X.shape[-1]])))[0]
 
 
         print(f"[DEBUG] #iter={idx_iter} ... \t loss = {loss_mse / n_batch_iterate}")
         
+        #new_lrate = learning_rate * (decay_rate ** (idx_iter+1 / decay_steps))
+        #optimizer.learning_rate = new_lrate
+
         if idx_iter == 100:
             exit()
 

@@ -56,7 +56,7 @@ def get_embedder(n_freqs: int, /, n_input_dims: int = 3):
         return nn.Identity(), 3
     
     embed_kwargs = {
-        "include_input": True, 
+        "include_input": False if 2 == n_input_dims else 3, 
         "input_dims": n_input_dims, 
         "max_freq_log2": n_freqs-1, 
         "num_freqs": n_freqs, 
