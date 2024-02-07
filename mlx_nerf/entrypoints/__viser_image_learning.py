@@ -20,6 +20,8 @@ from mlx_nerf.ops.metric import MSE
 
 def init_gui(server: viser.ViserServer, **config) -> None:
 
+    server.reset_scene()
+
     num_frames = config.get("num_frames", 10000)
 
     with server.add_gui_folder("Playback"):
