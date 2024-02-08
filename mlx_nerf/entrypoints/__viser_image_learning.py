@@ -210,11 +210,21 @@ def main(
 
         # TODO: check `grads.shape` per `batch_size`, and come up with a way of aggregating them
 
-        for X, y in batch_iterate(batch_size:=1, img_gt): # FIXME: learning fails when batch_size>1
+        for X, y in batch_iterate(batch_size:=2, img_gt): # FIXME: learning fails when batch_size>1
             
             # FIXME: they should be evaluated once all pixels have been inferred   
             # TODO: maybe batch iterate inside of this function?
-            loss, grads = loss_and_grad_fn(model, X, y)          
+            loss, grads = loss_and_grad_fn(model, X, y)
+
+            for k, v in grads.items():
+                print(f"{k}")
+
+                if isinstance(v, list):
+                    for d in v:
+                        for k2, v2 in d.items():
+                            print(f"{k2} {v2.shape}")
+            exit()
+
             optimizer.update(model, grads)
             mx.eval(model.parameters(), optimizer.state)
     
