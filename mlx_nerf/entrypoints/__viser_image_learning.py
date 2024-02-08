@@ -121,8 +121,14 @@ def load_mx_img_gt(path_img: Union[str, Path]) -> mx.array:
 
     return img_gt
 
+def get_mx_img_pred(shape: tuple):
 
-    
+    img_pred = mx.random.randint(255, 256, shape, dtype=mx.uint8) # TODO: change to `ones`
+    img_pred = img_pred.astype(mx.float32) / 255.0
+
+    print(f"{img_pred.shape=}")
+
+    return img_pred
 
 def main(
     path_assets: Path = get_project_root() / "assets",
@@ -150,10 +156,11 @@ def main(
         position=(4.0, 4.0, 0.0),
     )
 
+    img_pred = get_mx_img_pred(img_gt.shape)
+
     exit()
     
-    img_pred = mx.random.randint(255, 256, img_gt.shape, dtype=mx.uint8)
-    img_pred = img_pred.astype(mx.float32) / 255.0
+    
     # NOTE: embedding func test
     N_INPUT_DIMS = 2
     embed, out_dim = embedding.get_embedder(10, n_input_dims=N_INPUT_DIMS)
