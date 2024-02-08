@@ -55,31 +55,51 @@ def init_gui(server: viser.ViserServer, **config) -> None:
 
 def batch_iterate(batch_size: int, y: mx.array):
     
+    # NOTE: assuming [B, C, H, W]
+    H = y.shape[-2]
+    W = y.shape[-1]
     
     coords = onp.meshgrid(
         
-        onp.arange(0, y.shape[0]), 
-        onp.arange(0, y.shape[1]), 
+        onp.arange(0, H), 
+        onp.arange(0, W), 
         indexing="ij"
     ) # NOTE: `list`
     
     # TODO: convert all `np.ndarray`s into `mx.array`
     coords[0] = mx.array(coords[0])
     coords[1] = mx.array(coords[1])
-    
+    # print(f"{coords[0].shape=}")
+    # print(f"{coords[1].shape=}")
+    # exit()
+
     # TODO: stack meshgrids
     coords = mx.stack(coords, axis=-1)
     
     # TODO: reshape, now [H, W] has been flatten
-    coords = mx.reshape(coords, [-1, 2])
-    
-    onp.random.default_rng(seed=42) # NOTE: for debugging batch learning purpose
+    coords = mx.reshape(coords, [-1, 2])    
+    # print(f"{coords=}")
+    # print(f"{coords.shape=}")
+    # exit()
+
+    # onp.random.default_rng(seed=42) # NOTE: for debugging batch learning purpose
     choice = mx.array(onp.random.choice(coords.shape[0], size=[coords.shape[0]], replace=False)) # NOTE: [H*W]
-    for s in range(0, y.size, batch_size):
+    for s in range(0, H*W, batch_size):
+        # choice = mx.array(onp.random.choice(coords.shape[0], size=[coords.shape[0]], replace=False)) # NOTE: [H*W]
+        """
+        FIXME: peculiar behavior
+            batch_size=1 -> (1, )
+            batch_size=2 -> (2, )
+            batch_size=3 -> (3, )
+        """
         selected = choice[s : s + batch_size]
         
-        X_batch = coords[selected] 
-        y_batch = y[coords[selected][:, 0], coords[selected][:, 1]]
+        X_batch = coords[selected] # NOTE: [B, 2]
+        # print(f"{X_batch=}") 
+
+        # FIXME: deal with dimension change: [H, W] -> [B, C, H, W]
+        y_ = y[0].moveaxis(0, -1)
+        y_batch = y_[coords[selected][:, 0], coords[selected][:, 1]] # NOTE: [B, 2, 2]?
 
         yield (
             X_batch, 
@@ -100,7 +120,7 @@ def load_mx_img_gt(path_img: Union[str, Path]) -> mx.array:
         path_img = str(path_img)
 
     img_gt = imageio.imread(path_img)
-    img_gt = Image.fromarray(img_gt).resize((2, 2)) # NOTE: debugging purpose
+    img_gt = Image.fromarray(img_gt).resize((20, 20)) # NOTE: debugging purpose
     img_gt = onp.asarray(img_gt)
     img_gt = mx.array(img_gt)
 
@@ -145,10 +165,11 @@ def main(
 
     img_gt = load_mx_img_gt(path_assets / "images/albert.jpg")
     
+    # print(f"{img_gt[0].moveaxis(0, -1).shape=}")
     
     server.add_image(
         "/gt",
-        onp.array(img_gt[0], copy=False),
+        onp.array(img_gt[0].moveaxis(0, -1), copy=False),
         4.0,
         4.0,
         format="png", # NOTE: `jpeg` gives strangely stretched image
@@ -157,27 +178,21 @@ def main(
     )
 
     img_pred = get_mx_img_pred(img_gt.shape)
-
-    exit()
-    
     
     # NOTE: embedding func test
     N_INPUT_DIMS = 2
     embed, out_dim = embedding.get_embedder(10, n_input_dims=N_INPUT_DIMS)
-    input = mx.zeros(N_INPUT_DIMS)
-    output = embed(input)
-    print(f"[DEBUG] {out_dim=}")
-    print(f"[DEBUG] {output.shape=}")
 
     # NOTE: NeRF
     model = NeRF(
         channel_input=out_dim, # NOTE: embedded pixel position 
         channel_input_views=0, 
-        channel_output=1, 
+        channel_output=3, 
         is_use_view_directions=False, 
         # n_layers=5, # FIXME: dimension mismatching occurred
     )
     mx.eval(model.parameters())
+
 
     def mlx_mse(model, x, y):
         
@@ -195,19 +210,16 @@ def main(
     
     
     # NOTE: from https://github.com/NVlabs/tiny-cuda-nn/blob/master/data/config.json
-    learning_rate = 1*1e-5
-    optimizer = optim.Adam(learning_rate=learning_rate, betas=(0.9, 0.99))
-
-    idx_iter = 0    
-
-    decay_rate = 0.1
-    decay_steps = (lrate_decay := 250) * 1000
     
-
+    optimizer = optim.Adam(
+        learning_rate=(learning_rate := 1*1e-3), 
+        betas=(0.9, 0.99)
+    )
+    idx_iter = 0
     while True:
         server.add_image(
             "/pred",
-            onp.array(mx.repeat(img_pred, repeats=3, axis=-1), copy=False), # NOTE: view
+            onp.array(img_pred[0].moveaxis(0, -1), copy=False), # NOTE: view
             4.0,
             4.0,
             format="png", # NOTE: `jpeg` gives strangely stretched image
@@ -215,45 +227,40 @@ def main(
             position=(4.0, 0.0, 0.0),
         )
 
-        """
-        TODO: learning
-
-        - get pixel sample positions
-        - pass into encoder => augment sample positions
-        - (augmented i.e., encoded sample positions, pixel color) => MLP
-        - `mlx`-dependent optimization implementations (say, `.eval()`?)
-        """
-
         loss_mse = 0.0
         n_batch_iterate=0
 
         img_gt_visualized = onp.asarray(Image.fromarray(onp.array(img_gt * 255.0, copy=False).astype(onp.uint8)).resize((400, 400)))
-        pixels_np = (onp.array(img_pred, dtype=onp.float32, copy=False) * 255.0).astype(onp.uint8) # [H, W]
+        pixels_np = (onp.array(img_pred, copy=False) * 255.0).astype(onp.uint8) # [H, W]
         writer.append_data(
-            # pixels_np.transpose()
             onp.hstack([
                 img_gt_visualized, 
                 onp.asarray(Image.fromarray(pixels_np).resize((400, 400))),
             ])
-            # onp.asarray(Image.fromarray(pixels_np).resize((400, 400)))
         )
 
         # TODO: check `grads.shape` per `batch_size`, and come up with a way of aggregating them
 
-        for X, y in batch_iterate(batch_size:=2, img_gt): # FIXME: learning fails when batch_size>1
+        for X, y in batch_iterate(batch_size:=128, img_gt): # FIXME: learning fails when batch_size>1
             
             # FIXME: they should be evaluated once all pixels have been inferred   
             # TODO: maybe batch iterate inside of this function?
+            # print(f"{X.shape=}")
+            # print(f"{y.shape=}")
+            # print(f"{X=}")
+            # print(f"{y=}")
+            # exit()
+
             loss, grads = loss_and_grad_fn(model, X, y)
 
-            for k, v in grads.items():
-                print(f"{k}")
+            # for k, v in grads.items():
+            #     print(f"{k}")
 
-                if isinstance(v, list):
-                    for d in v:
-                        for k2, v2 in d.items():
-                            print(f"{k2} {v2.shape}")
-            exit()
+            #     if isinstance(v, list):
+            #         for d in v:
+            #             for k2, v2 in d.items():
+            #                 print(f"{k2} {v2.shape}")
+            # exit()
 
             optimizer.update(model, grads)
             mx.eval(model.parameters(), optimizer.state)
@@ -284,22 +291,25 @@ def main(
             # values = mx.reshape(values, )
             
             # FIXME: `squeeze` worked as there is only a single channel, adding color channel in images is encouraged
-            img_pred[X[..., 0], X[..., 1]] = values.squeeze(axis=-1) # TODO: concatenate `values`, and assign at once?
-            # img_pred[X[..., 0], X[..., 1], None] = values
+            # img_pred[X[..., 0], X[..., 1]] = values.squeeze(axis=-1) # TODO: concatenate `values`, and assign at once?
+            
+            img_pred = img_pred[0].moveaxis(0, -1)
+            img_pred[X[..., 0], X[..., 1]] = values
+            img_pred = img_pred.moveaxis(-1, 0)[None, ...]
 
             # break
 
         
 
 
-        print(f"[DEBUG] #iter={idx_iter} ... \t loss = {loss_mse / n_batch_iterate}")
+        # print(f"[DEBUG] #iter={idx_iter} ... \t loss = {loss_mse / n_batch_iterate}")
         
         # new_lrate = learning_rate * (decay_rate ** (idx_iter+1 / decay_steps))
         # optimizer.learning_rate = new_lrate
 
         
 
-        if idx_iter == 60:
+        if idx_iter == 6000:
             writer.close()
             exit()
 
