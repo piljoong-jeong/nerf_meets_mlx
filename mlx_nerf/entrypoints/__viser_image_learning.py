@@ -120,7 +120,7 @@ def load_mx_img_gt(path_img: Union[str, Path]) -> mx.array:
         path_img = str(path_img)
 
     img_gt = imageio.imread(path_img)
-    img_gt = Image.fromarray(img_gt).resize((64, 64)) # NOTE: debugging purpose
+    img_gt = Image.fromarray(img_gt).resize((400, 400)) # NOTE: debugging purpose
     img_gt = onp.asarray(img_gt)
     img_gt = mx.array(img_gt)
 
@@ -223,7 +223,6 @@ def main(
     
     
     # NOTE: from https://github.com/NVlabs/tiny-cuda-nn/blob/master/data/config.json
-    
     optimizer = optim.Adam(
         learning_rate=(learning_rate := 1*1e-3), 
         betas=(0.9, 0.99)
@@ -259,28 +258,9 @@ def main(
             ])
         )
 
-        # TODO: check `grads.shape` per `batch_size`, and come up with a way of aggregating them
-
-        for X, y in batch_iterate(batch_size:=64*64//4, img_gt): # FIXME: learning fails when batch_size>1
+        for X, y in batch_iterate(batch_size:=400*400//4, img_gt):
             
-            # FIXME: they should be evaluated once all pixels have been inferred   
-            # TODO: maybe batch iterate inside of this function?
-            # print(f"{X.shape=}")
-            # print(f"{y.shape=}")
-            # print(f"{X=}")
-            # print(f"{y=}")
-            # exit()
-
             loss, grads = loss_and_grad_fn(model, X, y)
-
-            # for k, v in grads.items():
-            #     print(f"{k}")
-
-            #     if isinstance(v, list):
-            #         for d in v:
-            #             for k2, v2 in d.items():
-            #                 print(f"{k2} {v2.shape}")
-            # exit()
 
             optimizer.update(model, grads)
             mx.eval(model.parameters(), optimizer.state)
@@ -288,36 +268,14 @@ def main(
             loss_mse += loss
             n_batch_iterate += 1
 
-            # for k, v in grads.items():
-            #     print(f"{k=} \t")
-            # exit()
-
-            #print(f"{batch_size=} {X.shape=}")
 
             X_flat = mx.reshape(X, [-1, X.shape[-1]])
-            #print(f"{batch_size=} {X_flat.shape=}") # NOTE: OK
-            
             X_embedded = embed(X_flat)
-            #print(f"{batch_size=} {X_embedded.shape=}") # NOTE: OK
-            # exit()
             values = model.forward(X_embedded)
-            #print(f"{values.shape=}") # TODO: unflat `X_flat`
-            #print(f"{img_pred[X[..., 0], X[..., 1]]=}")
-            # exit()
-            # print(f"{values=}")
-            
-            # print(f"{img_pred[X[..., 0], X[..., 1]]=}")
-
-            # values = mx.reshape(values, )
-            
-            # FIXME: `squeeze` worked as there is only a single channel, adding color channel in images is encouraged
-            # img_pred[X[..., 0], X[..., 1]] = values.squeeze(axis=-1) # TODO: concatenate `values`, and assign at once?
             
             img_pred = img_pred[0].moveaxis(0, -1)
             img_pred[X[..., 0], X[..., 1]] = values
             img_pred = img_pred.moveaxis(-1, 0)[None, ...]
-
-            # break
 
         
 
