@@ -2,7 +2,7 @@ import os
 import pprint
 import time
 from pathlib import Path
-from typing import List, Union
+from typing import List, Optional, Tuple, Union
 from PIL import Image
 
 import imageio.v2 as imageio
@@ -120,7 +120,7 @@ def load_mx_img_gt(path_img: Union[str, Path]) -> mx.array:
         path_img = str(path_img)
 
     img_gt = imageio.imread(path_img)
-    img_gt = Image.fromarray(img_gt).resize((20, 20)) # NOTE: debugging purpose
+    img_gt = Image.fromarray(img_gt).resize((64, 64)) # NOTE: debugging purpose
     img_gt = onp.asarray(img_gt)
     img_gt = mx.array(img_gt)
 
@@ -149,6 +149,19 @@ def get_mx_img_pred(shape: tuple):
     print(f"{img_pred.shape=}")
 
     return img_pred
+
+def mx_to_img(
+    a: mx.array, 
+    size: Optional[Tuple], 
+):
+    
+    result = onp.array(
+        (a * 255.0)[0].moveaxis(0, -1), copy=False).astype(onp.uint8)
+    if not None is size:
+        result = Image.fromarray(result).resize(size)
+        result = onp.asarray(result)
+
+    return result
 
 def main(
     path_assets: Path = get_project_root() / "assets",
@@ -230,18 +243,25 @@ def main(
         loss_mse = 0.0
         n_batch_iterate=0
 
-        img_gt_visualized = onp.asarray(Image.fromarray(onp.array(img_gt * 255.0, copy=False).astype(onp.uint8)).resize((400, 400)))
-        pixels_np = (onp.array(img_pred, copy=False) * 255.0).astype(onp.uint8) # [H, W]
+        # img_gt_visualized = onp.asarray(Image.fromarray(onp.array(img_gt * 255.0, copy=False).astype(onp.uint8)).resize((400, 400)))
+        # pixels_np = (onp.array(img_pred, copy=False) * 255.0).astype(onp.uint8) # [H, W]
+        
+        resize = (400, 400)
+        img_gt_visualized = mx_to_img(img_gt, resize)
+        pixels_np = mx_to_img(img_pred, resize)
+
+        
+        
         writer.append_data(
             onp.hstack([
                 img_gt_visualized, 
-                onp.asarray(Image.fromarray(pixels_np).resize((400, 400))),
+                pixels_np,
             ])
         )
 
         # TODO: check `grads.shape` per `batch_size`, and come up with a way of aggregating them
 
-        for X, y in batch_iterate(batch_size:=128, img_gt): # FIXME: learning fails when batch_size>1
+        for X, y in batch_iterate(batch_size:=64*64//4, img_gt): # FIXME: learning fails when batch_size>1
             
             # FIXME: they should be evaluated once all pixels have been inferred   
             # TODO: maybe batch iterate inside of this function?
@@ -309,7 +329,7 @@ def main(
 
         
 
-        if idx_iter == 6000:
+        if idx_iter == 600:
             writer.close()
             exit()
 
