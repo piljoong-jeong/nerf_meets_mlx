@@ -2,7 +2,7 @@ import os
 import pprint
 import time
 from pathlib import Path
-from typing import List
+from typing import List, Union
 from PIL import Image
 
 import imageio.v2 as imageio
@@ -73,6 +73,7 @@ def batch_iterate(batch_size: int, y: mx.array):
     # TODO: reshape, now [H, W] has been flatten
     coords = mx.reshape(coords, [-1, 2])
     
+    onp.random.default_rng(seed=42) # NOTE: for debugging batch learning purpose
     choice = mx.array(onp.random.choice(coords.shape[0], size=[coords.shape[0]], replace=False)) # NOTE: [H*W]
     for s in range(0, y.size, batch_size):
         selected = choice[s : s + batch_size]
@@ -85,7 +86,43 @@ def batch_iterate(batch_size: int, y: mx.array):
             y_batch
         )
 
-        
+def load_mx_img_gt(path_img: Union[str, Path]) -> mx.array:
+    """
+    
+    Loads an image.
+    If there is only a single color channel, repeat to ensure 3 channels to render
+
+    Returns:
+        - An `mx.array` contains image pixel information in a dimension format [B=1, C=3, H, W]
+    """
+
+    if isinstance(path_img, Path):
+        path_img = str(path_img)
+
+    img_gt = imageio.imread(path_img)
+    img_gt = Image.fromarray(img_gt).resize((2, 2)) # NOTE: debugging purpose
+    img_gt = onp.asarray(img_gt)
+    img_gt = mx.array(img_gt)
+
+    if len(img_gt.shape) == 3:
+        # TODO: check dimension with color channels, and ensure that is located at the first axis
+        img_gt = mx.transpose(img_gt, -1, 0)
+    # NOTE: if the image has only single channel, expand to 3 channels
+    if len(img_gt.shape) == 2:
+        img_gt = mx.repeat(img_gt[None, ...], repeats=3, axis=0)
+    
+    assert img_gt.shape[0] == 3
+    
+    # NOTE: add batch dimension
+    img_gt = img_gt[None, ...]
+    img_gt = img_gt.astype(mx.float32) / 255.0
+
+    print(f"{img_gt.shape=}")
+
+    return img_gt
+
+
+    
 
 def main(
     path_assets: Path = get_project_root() / "assets",
@@ -100,14 +137,12 @@ def main(
         server, 
     )
 
-
-    img_gt = imageio.imread(str(path_img := path_assets / "images/albert.jpg"))
-    img_gt = onp.asarray(Image.fromarray(img_gt).resize((100, 100)))
-    img_gt = mx.array(img_gt)
-    img_gt = img_gt.astype(mx.float32) / 255.0
+    img_gt = load_mx_img_gt(path_assets / "images/albert.jpg")
+    
+    
     server.add_image(
         "/gt",
-        onp.array(mx.repeat(img_gt[..., None], repeats=3, axis=-1), copy=False),
+        onp.array(img_gt[0], copy=False),
         4.0,
         4.0,
         format="png", # NOTE: `jpeg` gives strangely stretched image
@@ -115,11 +150,10 @@ def main(
         position=(4.0, 4.0, 0.0),
     )
 
+    exit()
     
     img_pred = mx.random.randint(255, 256, img_gt.shape, dtype=mx.uint8)
     img_pred = img_pred.astype(mx.float32) / 255.0
-    # pred = mx.repeat(pred, repeats=3, axis=-1)
-
     # NOTE: embedding func test
     N_INPUT_DIMS = 2
     embed, out_dim = embedding.get_embedder(10, n_input_dims=N_INPUT_DIMS)
@@ -142,19 +176,8 @@ def main(
         
         x_flat = mx.reshape(x, [-1, x.shape[-1]])
         x_embedded = embed(x_flat)
-
-        # NOTE: raw pixel position may cause optimization failure, which produces NaN
-        # NOTE: hence we divide original pixel positions by its shape per axis
-        
-        # NOTE: disabled as we excluded input when dim=2
-        #if 2 == N_INPUT_DIMS:
-        #    x_embedded[..., 0] /= img_gt.shape[0]
-        #    x_embedded[..., 1] /= img_gt.shape[1]
-        
         
         mse = mx.mean((model.forward(x_embedded) - y) ** 2)
-        
-        # relative_l2_error = (model.forward(x_embedded))
 
         return mse
         
