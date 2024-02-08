@@ -1,4 +1,5 @@
 import os
+import pprint
 import time
 from pathlib import Path
 from typing import List
@@ -164,7 +165,7 @@ def main(
     
     
     # NOTE: from https://github.com/NVlabs/tiny-cuda-nn/blob/master/data/config.json
-    learning_rate = 1*1e-3
+    learning_rate = 1*1e-5
     optimizer = optim.Adam(learning_rate=learning_rate, betas=(0.9, 0.99))
 
     idx_iter = 0    
@@ -195,20 +196,56 @@ def main(
 
         loss_mse = 0.0
         n_batch_iterate=0
+
+        img_gt_visualized = onp.asarray(Image.fromarray(onp.array(img_gt * 255.0, copy=False).astype(onp.uint8)).resize((400, 400)))
+        pixels_np = (onp.array(img_pred, dtype=onp.float32, copy=False) * 255.0).astype(onp.uint8) # [H, W]
+        writer.append_data(
+            # pixels_np.transpose()
+            onp.hstack([
+                img_gt_visualized, 
+                onp.asarray(Image.fromarray(pixels_np).resize((400, 400))),
+            ])
+            # onp.asarray(Image.fromarray(pixels_np).resize((400, 400)))
+        )
+
+        # TODO: check `grads.shape` per `batch_size`, and come up with a way of aggregating them
+
         for X, y in batch_iterate(batch_size:=1, img_gt): # FIXME: learning fails when batch_size>1
             
-            loss, grads = loss_and_grad_fn(model, X, y) # FIXME: they should be evaluated once all pixels have been inferred            
+            # FIXME: they should be evaluated once all pixels have been inferred   
+            # TODO: maybe batch iterate inside of this function?
+            loss, grads = loss_and_grad_fn(model, X, y)          
             optimizer.update(model, grads)
             mx.eval(model.parameters(), optimizer.state)
     
             loss_mse += loss
             n_batch_iterate += 1
 
-            values = model.forward(embed(mx.reshape(X, [-1, X.shape[-1]])))[0]
-            # print(f"{values=}")
-            # print(f"{img_pred[X[..., 0], X[..., 1]]=}")
+            # for k, v in grads.items():
+            #     print(f"{k=} \t")
+            # exit()
+
+            #print(f"{batch_size=} {X.shape=}")
+
+            X_flat = mx.reshape(X, [-1, X.shape[-1]])
+            #print(f"{batch_size=} {X_flat.shape=}") # NOTE: OK
             
-            img_pred[X[..., 0], X[..., 1]] = values
+            X_embedded = embed(X_flat)
+            #print(f"{batch_size=} {X_embedded.shape=}") # NOTE: OK
+            # exit()
+            values = model.forward(X_embedded)
+            #print(f"{values.shape=}") # TODO: unflat `X_flat`
+            #print(f"{img_pred[X[..., 0], X[..., 1]]=}")
+            # exit()
+            # print(f"{values=}")
+            
+            # print(f"{img_pred[X[..., 0], X[..., 1]]=}")
+
+            # values = mx.reshape(values, )
+            
+            # FIXME: `squeeze` worked as there is only a single channel, adding color channel in images is encouraged
+            img_pred[X[..., 0], X[..., 1]] = values.squeeze(axis=-1) # TODO: concatenate `values`, and assign at once?
+            # img_pred[X[..., 0], X[..., 1], None] = values
 
             # break
 
@@ -220,13 +257,12 @@ def main(
         # new_lrate = learning_rate * (decay_rate ** (idx_iter+1 / decay_steps))
         # optimizer.learning_rate = new_lrate
 
-        pixels_np = (onp.array(img_pred, dtype=onp.float32, copy=False) * 255.0).astype(onp.uint8) # [H, W]
-        writer.append_data(pixels_np.transpose())
+        
 
-        if idx_iter == 10:
+        if idx_iter == 60:
             writer.close()
             exit()
 
 
         idx_iter += 1
-        time.sleep(0.1)
+        #time.sleep(0.1)
