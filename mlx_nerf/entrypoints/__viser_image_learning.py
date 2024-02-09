@@ -69,37 +69,24 @@ def batch_iterate(batch_size: int, y: mx.array):
     # TODO: convert all `np.ndarray`s into `mx.array`
     coords[0] = mx.array(coords[0])
     coords[1] = mx.array(coords[1])
-    # print(f"{coords[0].shape=}")
-    # print(f"{coords[1].shape=}")
-    # exit()
+    
 
     # TODO: stack meshgrids
     coords = mx.stack(coords, axis=-1)
     
     # TODO: reshape, now [H, W] has been flatten
     coords = mx.reshape(coords, [-1, 2])    
-    # print(f"{coords=}")
-    # print(f"{coords.shape=}")
-    # exit()
-
+    
     # onp.random.default_rng(seed=42) # NOTE: for debugging batch learning purpose
     choice = mx.array(onp.random.choice(coords.shape[0], size=[coords.shape[0]], replace=False)) # NOTE: [H*W]
     for s in range(0, H*W, batch_size):
-        # choice = mx.array(onp.random.choice(coords.shape[0], size=[coords.shape[0]], replace=False)) # NOTE: [H*W]
-        """
-        FIXME: peculiar behavior
-            batch_size=1 -> (1, )
-            batch_size=2 -> (2, )
-            batch_size=3 -> (3, )
-        """
+        
         selected = choice[s : s + batch_size]
         
         X_batch = coords[selected] # NOTE: [B, 2]
-        # print(f"{X_batch=}") 
-
-        # FIXME: deal with dimension change: [H, W] -> [B, C, H, W]
+        
         y_ = y[0].moveaxis(0, -1)
-        y_batch = y_[coords[selected][:, 0], coords[selected][:, 1]] # NOTE: [B, 2, 2]?
+        y_batch = y_[coords[selected][:, 0], coords[selected][:, 1]]
 
         yield (
             X_batch, 
@@ -137,7 +124,7 @@ def load_mx_img_gt(path_img: Union[str, Path]) -> mx.array:
     img_gt = img_gt[None, ...]
     img_gt = img_gt.astype(mx.float32) / 255.0
 
-    print(f"{img_gt.shape=}")
+    
 
     return img_gt
 
@@ -217,10 +204,6 @@ def main(
         return mse
         
     loss_and_grad_fn = nn.value_and_grad(model, mlx_mse)
-
-
-
-    
     
     # NOTE: from https://github.com/NVlabs/tiny-cuda-nn/blob/master/data/config.json
     optimizer = optim.Adam(
