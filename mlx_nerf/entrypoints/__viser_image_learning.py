@@ -124,7 +124,7 @@ def load_mx_img_gt(path_img: Union[str, Path]) -> mx.array:
     img_gt = img_gt[None, ...]
     img_gt = img_gt.astype(mx.float32) / 255.0
 
-    
+    assert len(img_gt.shape) == 4
 
     return img_gt
 
@@ -133,7 +133,7 @@ def get_mx_img_pred(shape: tuple):
     img_pred = mx.random.randint(255, 256, shape, dtype=mx.uint8) # TODO: change to `ones`
     img_pred = img_pred.astype(mx.float32) / 255.0
 
-    print(f"{img_pred.shape=}")
+    assert len(img_pred.shape) == 4
 
     return img_pred
 
