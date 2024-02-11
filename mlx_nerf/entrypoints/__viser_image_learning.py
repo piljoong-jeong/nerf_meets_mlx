@@ -113,11 +113,14 @@ def load_mx_img_gt(path_img: Union[str, Path]) -> mx.array:
 
     if len(img_gt.shape) == 3:
         # TODO: check dimension with color channels, and ensure that is located at the first axis
-        img_gt = mx.transpose(img_gt, -1, 0)
+        img_gt = mx.moveaxis(img_gt, -1, 0)
     # NOTE: if the image has only single channel, expand to 3 channels
     if len(img_gt.shape) == 2:
         img_gt = mx.repeat(img_gt[None, ...], repeats=3, axis=0)
-    
+    # NOTE: remove alpha channel
+    if img_gt.shape[0] == 4:
+        img_gt = img_gt[:3, ...]
+
     assert img_gt.shape[0] == 3
     
     # NOTE: add batch dimension
@@ -143,7 +146,7 @@ def mx_to_img(
 ):
     
     result = onp.array(
-        (a * 255.0)[0].moveaxis(0, -1), copy=False).astype(onp.uint8)
+        (mx.clip(a, 0.0, 1.0) * 255.0)[0].moveaxis(0, -1), copy=False).astype(onp.uint8)
     if not None is size:
         result = Image.fromarray(result).resize(size)
         result = onp.asarray(result)
@@ -163,9 +166,7 @@ def main(
         server, 
     )
 
-    img_gt = load_mx_img_gt(path_assets / "images/albert.jpg")
-    
-    # print(f"{img_gt[0].moveaxis(0, -1).shape=}")
+    img_gt = load_mx_img_gt(path_assets / "images/inkling.png")
     
     server.add_image(
         "/gt",
@@ -207,7 +208,7 @@ def main(
     
     # NOTE: from https://github.com/NVlabs/tiny-cuda-nn/blob/master/data/config.json
     optimizer = optim.Adam(
-        learning_rate=(learning_rate := 1*1e-3), 
+        learning_rate=(learning_rate := 1*1e-2), 
         betas=(0.9, 0.99)
     )
     idx_iter = 0
