@@ -22,7 +22,29 @@ from mlx_nerf.models import embedding
 from mlx_nerf.models.NeRF import NeRF
 from mlx_nerf.ops.metric import MSE
 
+is_learning = False
+gui_btn_start: Optional[viser.GuiButtonHandle] = None
+
+def toggle_learning():
+    global is_learning
+    global gui_btn_start
+    is_learning = not is_learning
+
+    str_button = {
+        False: "Start Learning", 
+        True: "Stop Learning", 
+    }[is_learning]
+
+    print(f"{str_button=}")
+
+    gui_btn_start.value = str_button
+
+    return
+    
+
 def init_gui(server: viser.ViserServer, **config) -> None:
+
+    global gui_btn_start
 
     server.reset_scene()
 
@@ -37,12 +59,13 @@ def init_gui(server: viser.ViserServer, **config) -> None:
             initial_value=1000,
             disabled=False,
         )
-        gui_btn_start = server.add_gui_button("Start Learning", disabled=True)
+        gui_btn_start = server.add_gui_button(
+            "Start Learning", 
+        )
         
-        
+    gui_btn_start.on_click(lambda _: toggle_learning())
 
     server.configure_theme(
-        # titlebar_content="NeRF using MLX", # FIXME: this results blank page
         control_layout="fixed",
         control_width="medium",
         dark_mode=True,
@@ -161,23 +184,35 @@ def main(
 ):
 
     server = viser.ViserServer()
-
-    init_gui(
-        server, 
+    server.configure_theme(
+        control_layout="fixed",
+        control_width="medium",
+        dark_mode=True,
+        show_logo=False,
+        show_share_button=False,
+        brand_color=PJ_PINK
     )
 
-    img_gt = load_mx_img_gt(path_assets / "images/inkling.png")
-    
-    server.add_image(
-        "/gt",
-        onp.array(img_gt[0].moveaxis(0, -1), copy=False),
-        4.0,
-        4.0,
-        format="png", # NOTE: `jpeg` gives strangely stretched image
-        wxyz=(1.0, 0.0, 0.0, 0.0),
-        position=(4.0, 4.0, 0.0),
-    )
+    num_frames = 10000
 
+    global gui_btn_start
+    gui_btn_start = server.add_gui_button(
+        "Start Learning", 
+    )
+    gui_slider_iterations = server.add_gui_slider(
+        "# Iterations",
+        min=0,
+        max=num_frames - 1,
+        step=1,
+        initial_value=0,
+        disabled=True,
+    )
+        
+        
+    gui_btn_start.on_click(lambda _: toggle_learning())
+
+
+    img_gt = load_mx_img_gt(path_assets / "images/albert.jpg")
     img_pred = get_mx_img_pred(img_gt.shape)
     
     # NOTE: embedding func test
@@ -190,7 +225,6 @@ def main(
         channel_input_views=0, 
         channel_output=3, 
         is_use_view_directions=False, 
-        # n_layers=5, # FIXME: dimension mismatching occurred
     )
     mx.eval(model.parameters())
 
@@ -202,7 +236,8 @@ def main(
         
         mse = mx.mean((model.forward(x_embedded) - y) ** 2)
 
-        return mse
+        result = mse
+        return result
         
     loss_and_grad_fn = nn.value_and_grad(model, mlx_mse)
     
@@ -211,8 +246,20 @@ def main(
         learning_rate=(learning_rate := 1*1e-2), 
         betas=(0.9, 0.99)
     )
-    idx_iter = 0
+    
+    idx_iter=0
     while True:
+
+        server.add_image(
+            "/gt",
+            onp.array(img_gt[0].moveaxis(0, -1), copy=False),
+            4.0,
+            4.0,
+            format="png", # NOTE: `jpeg` gives strangely stretched image
+            wxyz=(1.0, 0.0, 0.0, 0.0),
+            position=(4.0, 4.0, 0.0),
+        )
+
         server.add_image(
             "/pred",
             onp.array(img_pred[0].moveaxis(0, -1), copy=False), # NOTE: view
@@ -223,18 +270,14 @@ def main(
             position=(4.0, 0.0, 0.0),
         )
 
+
         loss_mse = 0.0
         n_batch_iterate=0
 
-        # img_gt_visualized = onp.asarray(Image.fromarray(onp.array(img_gt * 255.0, copy=False).astype(onp.uint8)).resize((400, 400)))
-        # pixels_np = (onp.array(img_pred, copy=False) * 255.0).astype(onp.uint8) # [H, W]
-        
         resize = (400, 400)
         img_gt_visualized = mx_to_img(img_gt, resize)
         pixels_np = mx_to_img(img_pred, resize)
 
-        
-        
         writer.append_data(
             onp.hstack([
                 img_gt_visualized, 
@@ -261,15 +304,7 @@ def main(
             img_pred[X[..., 0], X[..., 1]] = values
             img_pred = img_pred.moveaxis(-1, 0)[None, ...]
 
-        
-
-
-        # print(f"[DEBUG] #iter={idx_iter} ... \t loss = {loss_mse / n_batch_iterate}")
-        
-        # new_lrate = learning_rate * (decay_rate ** (idx_iter+1 / decay_steps))
-        # optimizer.learning_rate = new_lrate
-
-        
+    
 
         if idx_iter == 600:
             writer.close()
@@ -278,3 +313,5 @@ def main(
 
         idx_iter += 1
         #time.sleep(0.1)
+
+        gui_slider_iterations.value += 1
