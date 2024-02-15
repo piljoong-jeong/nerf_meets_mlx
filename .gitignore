@@ -158,4 +158,7 @@ assets/*
 assets/images/*
 !assets/images/albert.jpg
 
+results/*
+scripts/*
+
 .DS_Store
