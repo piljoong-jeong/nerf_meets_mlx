@@ -30,10 +30,10 @@ class NeRF(nn.Module):
             nn.Linear(width_layers+channel_input, width_layers)
             for i in range(n_layers-1)
         ]
-        self.list_linears_dir = [nn.Linear(width_layers+channel_input_views, width_layers//2)]
         # fmt: on
 
         if True is is_use_view_directions:
+            self.list_linears_dir = [nn.Linear(width_layers+channel_input_views, width_layers//2)]
             self.feature_linear = nn.Linear(width_layers, width_layers) # NOTE: last layer
             self.alpha_linear = nn.Linear(width_layers, 1)
             self.rgb_linear = nn.Linear(width_layers//2, 3)
