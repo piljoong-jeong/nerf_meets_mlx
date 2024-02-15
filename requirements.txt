@@ -1,0 +1,4 @@
+imageio==2.33.1
+imageio-ffmpeg==0.4.9
+mlx==0.1.0
+viser==0.1.23
