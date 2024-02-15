@@ -1,6 +1,7 @@
 import os
 import pprint
 import time
+from functools import partial, reduce
 from pathlib import Path
 from typing import List, Optional, Tuple, Union
 from PIL import Image
@@ -31,6 +32,9 @@ class GUIItem:
 
     writer: Optional[Format.Writer] = None
 
+    img_gt = None
+    img_pred = None
+
     pass
 
 gui_items = GUIItem()
@@ -41,7 +45,8 @@ def toggle_learning() -> None:
 
     if gui_items.is_learning:
         # NOTE: toggled on
-        gui_items.writer = imageio.v2.get_writer(os.path.join("", f"learning.mp4"), fps=60)
+        gui_items.writer = imageio.v2.get_writer(os.path.join("results", f"learning.mp4"), fps=60)
+        gui_items.img_pred = get_mx_img_pred(gui_items.img_gt.shape)
     else:
         # NOTE: toggled off - reset
 
@@ -182,16 +187,15 @@ def mx_to_img(
 
 def main(
     path_assets: Path = get_project_root() / "assets",
-    downsample_factor: int = 4,
+    batch_downsample_factor: int = 64,
     max_frames: int = 600,
 ):
 
-    server = init_gui_viser(max_frames=600)
+    server = init_gui_viser(max_frames=max_frames)
 
-    img_gt = load_mx_img_gt(path_assets / "images/albert.jpg")
-    img_pred = get_mx_img_pred(img_gt.shape)
+    gui_items.img_gt = load_mx_img_gt(path_assets / "images/albert.jpg")
+    gui_items.img_pred = get_mx_img_pred(gui_items.img_gt.shape)
     
-    # NOTE: embedding func test
     N_INPUT_DIMS = 2
     embed, out_dim = embedding.get_embedder(10, n_input_dims=N_INPUT_DIMS)
 
@@ -203,7 +207,6 @@ def main(
         is_use_view_directions=False, 
     )
     mx.eval(model.parameters())
-
 
     def mlx_mse(model, x, y):
         
@@ -219,17 +222,29 @@ def main(
     
     # NOTE: from https://github.com/NVlabs/tiny-cuda-nn/blob/master/data/config.json
     optimizer = optim.Adam(
-        learning_rate=(learning_rate := 1*1e-2), 
+        learning_rate=(learning_rate := 1*1e-3), 
         betas=(0.9, 0.99)
     )
     
-    
+    state = [model.state, optimizer.state]
 
+    @partial(mx.compile, inputs=state, outputs=state)
+    def step(X, y):
+        loss_and_grad_fn = nn.value_and_grad(model, mlx_mse)
+        loss, grads = loss_and_grad_fn(model, X, y)
+        optimizer.update(model, grads)
+        return loss
+    
     while True:
+
+
+        resize = (400, 400)
+        img_gt_vis = mx_to_img(gui_items.img_gt, resize)
+        img_pred_vis = mx_to_img(gui_items.img_pred, resize)
 
         server.add_image(
             "/gt",
-            onp.array(img_gt[0].moveaxis(0, -1), copy=False),
+            img_gt_vis, 
             4.0,
             4.0,
             format="png", # NOTE: `jpeg` gives strangely stretched image
@@ -239,7 +254,7 @@ def main(
 
         server.add_image(
             "/pred",
-            onp.array(img_pred[0].moveaxis(0, -1), copy=False), # NOTE: view
+            img_pred_vis,
             4.0,
             4.0,
             format="png", # NOTE: `jpeg` gives strangely stretched image
@@ -250,34 +265,38 @@ def main(
         if not gui_items.is_learning:
             continue
 
-        resize = (400, 400)
-        img_gt_visualized = mx_to_img(img_gt, resize)
-        pixels_np = mx_to_img(img_pred, resize)
 
         
-
-        for X, y in batch_iterate(batch_size:=400*400//4, img_gt):
+        
+        for X, y in batch_iterate(batch_size:=reduce(lambda a, b: a*b, resize)//batch_downsample_factor, gui_items.img_gt):
             
-            loss, grads = loss_and_grad_fn(model, X, y)
-
-            optimizer.update(model, grads)
-            mx.eval(model.parameters(), optimizer.state)
+            # NOTE: without JIT
+            #loss, grads = loss_and_grad_fn(model, X, y)
+            #optimizer.update(model, grads)
+            #mx.eval(model.parameters(), optimizer.state)
+            
+            # NOTE: with JIT
+            loss = step(X, y)
+            mx.eval(state)
 
             X_flat = mx.reshape(X, [-1, X.shape[-1]])
             X_embedded = embed(X_flat)
             values = model.forward(X_embedded)
             
-            img_pred = img_pred[0].moveaxis(0, -1)
-            img_pred[X[..., 0], X[..., 1]] = values
-            img_pred = img_pred.moveaxis(-1, 0)[None, ...]
+            gui_items.img_pred = gui_items.img_pred[0].moveaxis(0, -1)
+            gui_items.img_pred[X[..., 0], X[..., 1]] = values
+            gui_items.img_pred = gui_items.img_pred.moveaxis(-1, 0)[None, ...]
 
     
 
-        if gui_items.idx_iter == max_frames:
+        if gui_items.slider_iter.value == max_frames:
 
-            if not None is gui_items.writer:
-                gui_items.writer.close()
-                gui_items.writer = None
+            # if not None is gui_items.writer:
+            #     gui_items.writer.close()
+            #     gui_items.writer = None
+
+            print(f"[DEBUG] reached to maximum frame, learning stopped ...")
+            toggle_learning()
             
 
 
@@ -290,7 +309,7 @@ def main(
             assert not None is gui_items.writer
             gui_items.writer.append_data(
                 onp.hstack([
-                    img_gt_visualized, 
-                    pixels_np,
+                    img_gt_vis, 
+                    img_pred_vis,
                 ])
             )
