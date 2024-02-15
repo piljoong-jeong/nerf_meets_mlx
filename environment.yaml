@@ -1,0 +1,7 @@
+name: mlx_nerf
+dependencies:
+  - python=3.9
+  - anaconda
+  - pip
+  - pip:
+    - -r requirements.txt
