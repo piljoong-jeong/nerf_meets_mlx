@@ -152,6 +152,7 @@ cython_debug/
 #.idea/
 
 # NOTE: repository-specific
-assets/
+assets/*
+!assets/doc
 
 .DS_Store
