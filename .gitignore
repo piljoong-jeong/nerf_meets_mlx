@@ -154,5 +154,8 @@ cython_debug/
 # NOTE: repository-specific
 assets/*
 !assets/doc
+!assets/images
+assets/images/*
+!assets/images/albert.jpg
 
 .DS_Store
