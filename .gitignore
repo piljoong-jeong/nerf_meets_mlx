@@ -159,6 +159,6 @@ assets/images/*
 !assets/images/albert.jpg
 
 results/*
-scripts/*
+tests/
 
 .DS_Store
