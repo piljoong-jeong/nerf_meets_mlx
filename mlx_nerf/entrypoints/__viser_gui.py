@@ -38,7 +38,6 @@ def select_image(path_default: Union[str, Path]) -> None:
 def toggle_learning() -> None:
     
     gui_items.is_learning = not gui_items.is_learning
-    print(f"{gui_items.is_learning=}")
 
     if not gui_items.is_learning:
         gui_items.slider_iter.value = 0

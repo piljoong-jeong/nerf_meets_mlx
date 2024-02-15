@@ -5,9 +5,9 @@ from pathlib import Path
 from typing import List, Optional, Tuple, Union
 from PIL import Image
 
-import imageio.v2 as imageio
-writer = imageio.get_writer(os.path.join("", f"learning.mp4"), fps=60)
-import imageio.v3 as imageio
+
+import imageio.v2
+import imageio.v3
 import numpy as onp
 import mlx.core as mx
 import mlx.nn as nn
@@ -15,6 +15,7 @@ import mlx.optimizers as optim
 import viser
 import viser.extras
 import viser.transforms as tf
+from imageio.core.format import Format
 from tqdm.auto import tqdm
 
 from this_project import get_project_root, PJ_PINK
@@ -22,49 +23,41 @@ from mlx_nerf.models import embedding
 from mlx_nerf.models.NeRF import NeRF
 from mlx_nerf.ops.metric import MSE
 
-is_learning = False
-gui_btn_start: Optional[viser.GuiButtonHandle] = None
+class GUIItem:
+    cbox_learning: Optional[viser.GuiButtonHandle] = None
+    is_learning = False
+    slider_iter: Optional[viser.GuiInputHandle] = None
+    idx_iter = 0
 
-def toggle_learning():
-    global is_learning
-    global gui_btn_start
-    is_learning = not is_learning
+    writer: Optional[Format.Writer] = None
 
-    str_button = {
-        False: "Start Learning", 
-        True: "Stop Learning", 
-    }[is_learning]
+    pass
 
-    print(f"{str_button=}")
+gui_items = GUIItem()
 
-    gui_btn_start.value = str_button
+def toggle_learning() -> None:
+    
+    gui_items.is_learning = not gui_items.is_learning
+
+    if gui_items.is_learning:
+        # NOTE: toggled on
+        gui_items.writer = imageio.v2.get_writer(os.path.join("", f"learning.mp4"), fps=60)
+    else:
+        # NOTE: toggled off - reset
+
+        gui_items.slider_iter.value = 0
+        if not None is gui_items.writer:
+            gui_items.writer.close()
+            gui_items.writer = None
 
     return
     
 
-def init_gui(server: viser.ViserServer, **config) -> None:
+def init_gui_viser(**config) -> viser.ViserServer:
 
-    global gui_btn_start
+    server = viser.ViserServer()
 
     server.reset_scene()
-
-    num_frames = config.get("num_frames", 10000)
-
-    with server.add_gui_folder("Playback"):
-        gui_slider_iterations = server.add_gui_slider(
-            "# Iterations",
-            min=0,
-            max=num_frames - 1,
-            step=1,
-            initial_value=1000,
-            disabled=False,
-        )
-        gui_btn_start = server.add_gui_button(
-            "Start Learning", 
-        )
-        
-    gui_btn_start.on_click(lambda _: toggle_learning())
-
     server.configure_theme(
         control_layout="fixed",
         control_width="medium",
@@ -74,7 +67,18 @@ def init_gui(server: viser.ViserServer, **config) -> None:
         brand_color=PJ_PINK
     )
 
-    return
+    gui_items.cbox_learning = server.add_gui_checkbox("Learning?", False)
+    gui_items.cbox_learning.on_update(lambda _: toggle_learning())
+    gui_items.slider_iter = server.add_gui_slider(
+        "# Iterations",
+        min=0,
+        max=(max_frames := config.get("max_frames", 10000)),
+        step=1,
+        initial_value=0,
+        disabled=True,
+    )
+
+    return server
 
 def batch_iterate(batch_size: int, y: mx.array):
     
@@ -129,7 +133,7 @@ def load_mx_img_gt(path_img: Union[str, Path]) -> mx.array:
     if isinstance(path_img, Path):
         path_img = str(path_img)
 
-    img_gt = imageio.imread(path_img)
+    img_gt = imageio.v3.imread(path_img)
     img_gt = Image.fromarray(img_gt).resize((400, 400)) # NOTE: debugging purpose
     img_gt = onp.asarray(img_gt)
     img_gt = mx.array(img_gt)
@@ -179,38 +183,10 @@ def mx_to_img(
 def main(
     path_assets: Path = get_project_root() / "assets",
     downsample_factor: int = 4,
-    max_frames: int = 100,
-    share: bool = False,
+    max_frames: int = 600,
 ):
 
-    server = viser.ViserServer()
-    server.configure_theme(
-        control_layout="fixed",
-        control_width="medium",
-        dark_mode=True,
-        show_logo=False,
-        show_share_button=False,
-        brand_color=PJ_PINK
-    )
-
-    num_frames = 10000
-
-    global gui_btn_start
-    gui_btn_start = server.add_gui_button(
-        "Start Learning", 
-    )
-    gui_slider_iterations = server.add_gui_slider(
-        "# Iterations",
-        min=0,
-        max=num_frames - 1,
-        step=1,
-        initial_value=0,
-        disabled=True,
-    )
-        
-        
-    gui_btn_start.on_click(lambda _: toggle_learning())
-
+    server = init_gui_viser(max_frames=600)
 
     img_gt = load_mx_img_gt(path_assets / "images/albert.jpg")
     img_pred = get_mx_img_pred(img_gt.shape)
@@ -247,7 +223,8 @@ def main(
         betas=(0.9, 0.99)
     )
     
-    idx_iter=0
+    
+
     while True:
 
         server.add_image(
@@ -270,20 +247,14 @@ def main(
             position=(4.0, 0.0, 0.0),
         )
 
-
-        loss_mse = 0.0
-        n_batch_iterate=0
+        if not gui_items.is_learning:
+            continue
 
         resize = (400, 400)
         img_gt_visualized = mx_to_img(img_gt, resize)
         pixels_np = mx_to_img(img_pred, resize)
 
-        writer.append_data(
-            onp.hstack([
-                img_gt_visualized, 
-                pixels_np,
-            ])
-        )
+        
 
         for X, y in batch_iterate(batch_size:=400*400//4, img_gt):
             
@@ -291,10 +262,6 @@ def main(
 
             optimizer.update(model, grads)
             mx.eval(model.parameters(), optimizer.state)
-    
-            loss_mse += loss
-            n_batch_iterate += 1
-
 
             X_flat = mx.reshape(X, [-1, X.shape[-1]])
             X_embedded = embed(X_flat)
@@ -306,12 +273,24 @@ def main(
 
     
 
-        if idx_iter == 600:
-            writer.close()
-            exit()
+        if gui_items.idx_iter == max_frames:
+
+            if not None is gui_items.writer:
+                gui_items.writer.close()
+                gui_items.writer = None
+            
 
 
-        idx_iter += 1
-        #time.sleep(0.1)
+        if gui_items.slider_iter.value >= max_frames:
+            continue
 
-        gui_slider_iterations.value += 1
+        if gui_items.is_learning:
+            gui_items.slider_iter.value += 1
+
+            assert not None is gui_items.writer
+            gui_items.writer.append_data(
+                onp.hstack([
+                    img_gt_visualized, 
+                    pixels_np,
+                ])
+            )
