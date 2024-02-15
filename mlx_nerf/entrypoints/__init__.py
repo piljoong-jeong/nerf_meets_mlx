@@ -4,5 +4,6 @@
 
 from .__viser_record3d import main as viser_record3d
 from .__viser_image_learning import main as viser_image_learning
+from .__viser_gui import main as viser_gui
 
 # TODO: set common theme here
