@@ -1,6 +1,4 @@
 import os
-import pprint
-import time
 from functools import partial, reduce
 from pathlib import Path
 from typing import List, Optional, Tuple, Union
@@ -193,7 +191,7 @@ def main(
 
     server = init_gui_viser(max_frames=max_frames)
 
-    gui_items.img_gt = load_mx_img_gt(path_assets / "images/albert.jpg")
+    gui_items.img_gt = load_mx_img_gt(path_assets / "image_learning/albert.jpg")
     gui_items.img_pred = get_mx_img_pred(gui_items.img_gt.shape)
     
     N_INPUT_DIMS = 2

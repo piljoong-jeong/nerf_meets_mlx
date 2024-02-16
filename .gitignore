@@ -154,9 +154,9 @@ cython_debug/
 # NOTE: repository-specific
 assets/*
 !assets/doc
-!assets/images
-assets/images/*
-!assets/images/albert.jpg
+!assets/image_learning
+assets/image_learning/*
+!assets/image_learning/albert.jpg
 
 results/*
 tests/
