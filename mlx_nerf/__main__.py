@@ -14,6 +14,6 @@ if __name__ == "__main__":
     mx.set_default_device(mx.gpu)
     tyro.cli(
         # entrypoints.viser_record3d
-        entrypoints.viser_image_learning
-        # entrypoints.viser_gui
+        # entrypoints.viser_image_learning
+        entrypoints.viser_gui
     )
