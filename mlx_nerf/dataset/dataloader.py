@@ -1,12 +1,13 @@
 import json
 import os
+from PIL import Image
 
-import cv2
 import imageio.v2 as imageio
 import numpy as np
-import torch
+import mlx.core as mx
 
-import NeRF.pose
+# from this_project import get_project_root
+from mlx_nerf.ops import pose
 
 # NOTE: implement Blender data loader
 def load_blender_data(basedir, half_res: bool=False, testskip=1):
@@ -57,12 +58,12 @@ def load_blender_data(basedir, half_res: bool=False, testskip=1):
     focal_length = 0.5*W / np.tan(0.5*camera_angle_x) # NOTE: see handwritten note
 
     # NOTE: poses for inference/test
-    render_poses = torch.stack(
+    render_poses = mx.stack(
         [
-            NeRF.pose.pose_spherical(theta=angle, phi=-30.0, radius=4.0) 
+            pose.pose_spherical(theta=angle, phi=-30.0, radius=4.0) 
             for angle
             in np.linspace(-180, 180, 160+1)[:-1]
-        ], dim=0
+        ], axis=0
     )
 
     if True is half_res:
@@ -74,7 +75,11 @@ def load_blender_data(basedir, half_res: bool=False, testskip=1):
 
         imgs_half_res = np.zeros((imgs.shape[0], H, W, 4))
         for idx, image in enumerate(imgs):
-            imgs_half_res[idx] = cv2.resize(image, (H, W), interpolation=cv2.INTER_AREA)
+            # imgs_half_res[idx] = cv2.resize(image, (H, W), interpolation=cv2.INTER_AREA)
+
+            # NOTE: no perfect equivalence: see https://stackoverflow.com/questions/73836615/equivalent-to-cv2-inter-area-in-pil
+            # TODO: validate
+            imgs_half_res[idx] = np.asarray(Image.fromarray(image).resize((H, W), Image.Resampling.LANCZOS)) 
         imgs = imgs_half_res
 
     return imgs, poses, render_poses, [H, W, focal_length], i_split
@@ -97,3 +102,15 @@ def post_load_blender_data(i_split, images, is_white_bkgd):
         images = images[..., :3]
 
     return i_train, i_val, i_test, near, far, images
+
+
+
+def main():
+    from pathlib import Path
+    dir_dataset = Path.home() / "Downloads" / "NeRF"
+    print(f"{dir_dataset=}")
+
+    return
+
+if __name__ == "__main__":
+    main()
