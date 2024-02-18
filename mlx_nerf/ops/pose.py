@@ -1,6 +1,6 @@
-import cv2
+import mlx.core as mx
 import numpy as np
-import torch
+
 
 
 # NOTE: synthetic pose generation from spherical coordinate
@@ -14,30 +14,30 @@ def pose_spherical(theta, phi, radius):
     
     # NOTE: WYSIWIG; row-major assignment
     def _trans_radius(r):
-        return torch.Tensor([ 
+        return mx.array([ 
             [1, 0, 0, 0], 
             [0, 1, 0, 0], 
             [0, 0, 1, r], # NOTE: lookat `-r` direction; from `r` to origin
             [0, 0, 0, 1]
-        ]).float()
+        ], dtype=mx.float32)
 
     def _rotate_phi(phi): # NOTE: pitch; right-thumb rule 👍
-        return torch.Tensor([
+        return mx.array([
             [1, 0, 0, 0], # NOTE: from X-axis, 
             [0, np.cos(phi), -np.sin(phi), 0], 
             [0, np.sin(phi), np.cos(phi), 0], 
             [0, 0, 0, 1]
-        ]).float()
+        ], dtype=mx.float32)
 
     def _rotate_theta(theta): # NOTE: Y-axis? yaw
         # NOTE: sign of `np.sin` inverted!; means inverted rotation direction (cw~ccw)
         # NOTE: it's up to developer's choice; no need to invert it, but it's convenient
-        return torch.Tensor([
+        return mx.array([
             [np.cos(theta), 0, -np.sin(theta), 0], 
             [0, 1, 0, 0], # NOTE: right thumb rule at Y-axis
             [np.sin(theta), 0, np.cos(theta), 0], 
             [0, 0, 0, 1]
-        ]).float()
+        ], dtype=mx.float32)
 
 
     # NOTE: generate pose
@@ -47,7 +47,7 @@ def pose_spherical(theta, phi, radius):
 
     def _cam_to_world(pose):
         # NOTE: should we wrap this with `np.array`?
-        return torch.Tensor(np.array([
+        return mx.array(np.array([
             [-1, 0, 0, 0], # NOTE: invert X-axis
             [0, 0, 1, 0], # NOTE: switch Y<->Z
             [0, 1, 0, 0], # NOTE: switch Z<->Y

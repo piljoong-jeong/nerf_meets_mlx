@@ -119,7 +119,10 @@ def main():
     print(f"{configs=}")
 
     
-    load_blender_data(dir_dataset / "data" / "nerf_synthetic" / "lego")
+    images, poses, render_poses, hwf, i_split = load_blender_data(dir_dataset / "data" / "nerf_synthetic" / "lego")
+    print(f"{images.shape=}")
+    print(f"{poses.shape=}")
+    print(f"{poses[0]}")
 
     return
 
