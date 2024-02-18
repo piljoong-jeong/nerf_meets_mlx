@@ -1,13 +1,17 @@
 import json
 import os
+import sys
 from PIL import Image
 
 import imageio.v2 as imageio
 import numpy as np
 import mlx.core as mx
 
-# from this_project import get_project_root
+if __name__ == "__main__":
+    sys.path.append(DIR_PROJECT_ROOT := os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+from mlx_nerf import config_parser
 from mlx_nerf.ops import pose
+
 
 # NOTE: implement Blender data loader
 def load_blender_data(basedir, half_res: bool=False, testskip=1):
@@ -109,6 +113,13 @@ def main():
     from pathlib import Path
     dir_dataset = Path.home() / "Downloads" / "NeRF"
     print(f"{dir_dataset=}")
+
+    path_config = dir_dataset / "configs/lego.txt"
+    configs = config_parser.load_config(None, path_config)
+    print(f"{configs=}")
+
+    
+    load_blender_data(dir_dataset / "data" / "nerf_synthetic" / "lego")
 
     return
 
