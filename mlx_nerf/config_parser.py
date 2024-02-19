@@ -99,3 +99,24 @@ def load_config(parser: argparse.ArgumentParser, filename_config: str = "configs
         configs[line[0]] = line[1]
 
     return configs
+
+# NOTE: per NeRF?
+def update_NeRF_args(args: argparse.Namespace, configs: dict):
+
+    args.expname = configs['expname']
+    args.basedir = configs['basedir']
+    args.datadir = configs['datadir']
+    args.dataset_type = configs['dataset_type']
+    args.no_batching = configs['no_batching']
+    args.use_viewdirs = configs['use_viewdirs']
+    args.white_bkgd = configs['white_bkgd']
+    args.lrate_decay = int(configs['lrate_decay'])
+    args.N_samples = int(configs['N_samples'])
+    args.N_importance = int(configs['N_importance'])
+    args.N_rand = int(configs['N_rand'])
+    args.precrop_iters = int(configs['precrop_iters'])
+    args.precrop_frac = float(configs['precrop_frac'])
+    args.half_res = configs['half_res']
+    args.no_reload = True
+
+    return args
