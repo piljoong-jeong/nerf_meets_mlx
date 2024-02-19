@@ -59,11 +59,12 @@ def create_NeRF(args):
     raw_noise_std = args.raw_noise_std
 
     output_ch = 5 if n_importance_samples else 4 # TODO: what was the reason?
-    skips = args.skips
+    # skips = args.skips
+    skips = [4]
 
     # NOTE: embed each samples
-    embedder_pos, channel_emb_pos = embedding.get_embedder(octave_pos) if True else None, None
-    embedder_dir, channel_emb_dir = embedding.get_embedder(octave_dir) if is_use_dir else None, None
+    embedder_pos, channel_emb_pos = embedding.get_embedder(octave_pos) if True else (None, None)
+    embedder_dir, channel_emb_dir = embedding.get_embedder(octave_dir) if is_use_dir else (None, None)
 
     # NOTE: define query function that internally batches
     network_query_fn = lambda inputs, viewdirs, model: run_model(
