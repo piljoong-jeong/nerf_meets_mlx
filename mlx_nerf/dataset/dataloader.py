@@ -2,9 +2,12 @@ import json
 import os
 import sys
 from PIL import Image
+from pathlib import Path
+from typing import Union
 
 import imageio.v2 as imageio
 import numpy as np
+import matplotlib.pyplot as plt
 import mlx.core as mx
 
 if __name__ == "__main__":
@@ -107,7 +110,23 @@ def post_load_blender_data(i_split, images, is_white_bkgd):
 
     return i_train, i_val, i_test, near, far, images
 
+def validate_dataset(path_dataset: Union[Path, str]):
+    """
+    Validate by plotting some of given dataset
+    """
 
+    with open(Path(path_dataset / "transforms_test.json")) as fp:
+        meta = json.load(fp)
+    _frames = meta["frames"]
+
+    fig, ax = plt.subplots(nrows=(nrows:=2), ncols=(ncols:=5), figsize=(ncols*3, nrows*3))
+    for i, _ax in enumerate(ax.flatten()):
+        _frame = _frames[i]
+        _img = imageio.imread(_fpath := Path(path_dataset / f"{_frame['file_path']}.png"))
+        _ax.imshow(_img)
+    plt.show()
+
+    return
 
 def main():
     from pathlib import Path

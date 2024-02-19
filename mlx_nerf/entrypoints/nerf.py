@@ -17,7 +17,7 @@ import viser.extras
 
 from this_project import get_project_root, PJ_PINK
 from mlx_nerf import config_parser
-from mlx_nerf.dataset.dataloader import load_blender_data
+from mlx_nerf.dataset.dataloader import load_blender_data, validate_dataset
 
 def main(
     path_dataset: Path = Path.home() / "Downloads" / "NeRF",
@@ -30,19 +30,7 @@ def main(
 
     dir_dataset = configs["datadir"]
     images, poses, render_poses, hwf, i_split = load_blender_data(path_dataset / dir_dataset)
+    validate_dataset(path_dataset / dir_dataset)
 
-
-    with open(Path(path_dataset / dir_dataset / "transforms_test.json")) as fp:
-        meta = json.load(fp)
-    _frames = meta["frames"]
-
-
-    fig, ax = plt.subplots(nrows=(nrows:=2), ncols=(ncols:=5), figsize=(ncols*3, nrows*3))
-    for i, _ax in enumerate(ax.flatten()):
-        _frame = _frames[i]
-        _img = imageio.imread(_fpath := Path(path_dataset / dir_dataset / f"{_frame['file_path']}.png"))
-        _ax.imshow(_img)
-    plt.show()
-
-
+    
 
