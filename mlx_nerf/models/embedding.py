@@ -1,6 +1,26 @@
 import mlx.core as mx
 import mlx.nn as nn
 
+def embed(pos, embed_pos, dir, embed_dir):
+    """
+    Embed input samples.
+    """
+
+    pos_flat = mx.reshape(pos, [-1, pos.shape[-1]])
+    embedded_pos = embed_pos(pos_flat)
+
+    if None is dir:
+        # NOTE: return embedded points only
+        result = embedded_pos
+    else:
+        # TODO: check: `dir.shape`
+        dirs = dir[:, None].expand(pos.shape)
+        dir_flat = mx.reshape(dirs, [-1, dirs.shape[-1]])
+        embedded_dir = embed_dir(dir_flat)
+        result = mx.concatenate([embedded_pos, embedded_dir], axis=-1)
+
+    return result
+
 class Embedder: 
     def __init__(self, **kwargs) -> None:
         self.kwargs = kwargs
