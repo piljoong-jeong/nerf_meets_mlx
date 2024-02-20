@@ -141,7 +141,8 @@ def create_NeRF(args):
         render_kwargs_train["lindisp"] = args.lindisp
 
     # NOTE: test arguments
-    render_kwargs_test = deepcopy(render_kwargs_train)
+    # render_kwargs_test = deepcopy(render_kwargs_train)
+    render_kwargs_test = render_kwargs_train # TODO: double-check
     render_kwargs_test["perturb"] = False
     render_kwargs_test["raw_noise_std"] = 0
 
