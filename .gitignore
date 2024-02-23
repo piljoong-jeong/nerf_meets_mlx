@@ -160,5 +160,6 @@ assets/image_learning/*
 
 results/*
 tests/
+logs/*
 
 .DS_Store
