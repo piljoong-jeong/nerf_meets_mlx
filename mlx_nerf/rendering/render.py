@@ -1,5 +1,48 @@
+"""### render_py
+###### in `mlx_nerf/rendering`
+
+Execution flow:
+    1. render(...)
+    2. batchify_rays(...)
+    3. render_rays(...)
+"""
+
 import mlx.core as mx
+
 from mlx_nerf.rendering import ray
+
+def decompose_ray_batch(
+    rays_batch_linear, # NOTE: [B, rays_o, rays_d, near, far, viewdirs (, time)]
+    is_time_included: bool = False # TODO: make flexable, like `dict[str, int]`?
+):
+    
+    rays_o, rays_d = rays_batch_linear[:, 0:3], rays_batch_linear[:, 3:6]
+    near = rays_batch_linear[:, 6]
+    far = rays_batch_linear[:, 7]
+    viewdirs = rays_batch_linear[:, 8:11]
+    frame_time = rays_batch_linear[:, -1] if is_time_included else None
+    
+    return rays_o, rays_d, near, far, viewdirs, frame_time
+
+def render_rays(
+    rays_batch_linear, # NOTE: [B, rays_o, rays_d, near, far, viewdirs]
+    network_fn, 
+    network_query_fn, 
+    N_samples, 
+    retraw=False, 
+    lindisp=False, 
+    perturb=0.0, 
+    N_imporatance=0, 
+    network_fine=None, 
+    white_bkgd=False, 
+    raw_noise_std=0.0, 
+    verbose=False, 
+    pytest=False,
+):
+    
+
+
+    return
 
 def batchify_rays(
     rays_linear, 
