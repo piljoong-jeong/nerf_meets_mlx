@@ -91,10 +91,11 @@ def decompose_ray_batch(
 ):
     
     rays_o, rays_d = rays_batch_linear[:, 0:3], rays_batch_linear[:, 3:6]
-    near = rays_batch_linear[:, 6]
-    far = rays_batch_linear[:, 7]
+    
+    bounds = mx.reshape(rays_batch_linear[..., 6:8], [-1, 1, 3])
+    near, far = bounds[..., 0], bounds[..., 1]
     viewdirs = rays_batch_linear[:, 8:11]
-    frame_time = rays_batch_linear[:, -1] if is_time_included else None
+    frame_time = bounds[..., 2] if is_time_included else None
     
     return rays_o, rays_d, near, far, viewdirs, frame_time
 
@@ -139,7 +140,7 @@ def render_rays(
     ret["disp_map"] = disp_coarse
     ret["acc_map"] = acc_coarse
 
-    if N_imporatance <= 0 and True:
+    if N_importance <= 0 and True:
         return ret
     
     return ret
