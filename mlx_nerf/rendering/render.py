@@ -10,9 +10,29 @@ Execution flow:
 import mlx.core as mx
 
 from mlx_nerf.rendering import ray
-from mlx_nerf.sampling import uniform
 from mlx_nerf import sampling
 from mlx_nerf.sampling import uniform, linear_disparity
+
+def raw2outputs(
+    raw, 
+    z_vals, # NOTE: [B, `n_depth_samples` from `render_rays(...)`]
+    rays_d, 
+    raw_noise_std=0, 
+    white_bkgd=False, 
+    pytest=False,
+):
+    
+    # NOTE: relative distance
+    dists = z_vals[..., 1:] - z_vals[..., :-1] # NOTE: [B, n_depth_samples-1]
+    # NOTE: add infinite value at the end of `dists`
+    dists = mx.concatenate(
+        [
+            dists, 
+            mx.expand_dims(mx.repeat(mx.array([1e10])[None, ...], repeats=z_vals[0], axis=0), axis=-1)
+        ], axis=-1
+    )
+
+    return
 
 def decompose_ray_batch(
     rays_batch_linear, # NOTE: [B, rays_o, rays_d, near, far, viewdirs (, time)]
