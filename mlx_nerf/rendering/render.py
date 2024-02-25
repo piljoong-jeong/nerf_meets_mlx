@@ -10,6 +10,7 @@ Execution flow:
 import mlx.core as mx
 
 from mlx_nerf.rendering import ray
+from mlx_nerf.sampling import uniform
 
 def decompose_ray_batch(
     rays_batch_linear, # NOTE: [B, rays_o, rays_d, near, far, viewdirs (, time)]
@@ -28,7 +29,7 @@ def render_rays(
     rays_batch_linear, # NOTE: [B, rays_o, rays_d, near, far, viewdirs]
     network_fn, 
     network_query_fn, 
-    N_samples, 
+    n_samples, 
     retraw=False, 
     lindisp=False, 
     perturb=0.0, 
@@ -40,7 +41,11 @@ def render_rays(
     pytest=False,
 ):
     
+    n_rays = rays_batch_linear.shape[0]
+    rays_o, rays_d, near, far, viewdirs, _ = decompose_ray_batch(rays_batch_linear)
 
+    # NOTE: sample z-values for coarse NeRF
+    z_vals = uniform.uniform_sample_z(near, far, n_samples)
 
     return
 
