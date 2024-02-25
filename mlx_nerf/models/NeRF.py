@@ -127,8 +127,8 @@ def create_NeRF(args):
         "network_query_fn": network_query_fn, 
         
         # NOTE: coarse
-        "network_fn": model, 
-        "N_samples": n_samples, 
+        "network_coarse": model, 
+        "N_samples": n_samples, # NOTE: num. uniform samples
 
         # NOTE: fine
         "network_fine": model_fine, 

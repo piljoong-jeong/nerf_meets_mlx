@@ -8,6 +8,7 @@ Execution flow:
 """
 
 import mlx.core as mx
+import mlx.nn as nn
 
 from mlx_nerf.rendering import ray
 from mlx_nerf import sampling
@@ -21,21 +22,67 @@ def raw2outputs(
     white_bkgd=False, 
     pytest=False,
 ):
+    """
     
+    NOTE: here, 
+        * alpha == density
+        * weights == transmittance
+    """
+
+    # NOTE: decompose `raw`
+    raw_rgb = raw[..., :3]
+    raw_density = raw[..., 3]
+
+    # NOTE: add noise if desired, to avoid overfitting
+    if raw_noise_std > 0.0:
+        noise = mx.random.normal(raw_density.shape) * raw_noise_std
+        raw_density = raw_density + noise
+
     # NOTE: relative distance
-    dists = z_vals[..., 1:] - z_vals[..., :-1] # NOTE: [B, n_depth_samples-1]
+    delta_dists = z_vals[..., 1:] - z_vals[..., :-1] # NOTE: [B, n_depth_samples-1]
     # NOTE: add infinite value at the end of `dists`
-    dist_limit = mx.array(1e10)
-    dist_limit = mx.repeat(dist_limit[None, ...], repeats=z_vals[0], axis=0)
-    dist_limit = mx.expand_dims(dist_limit, axis=-1)
-    dists = mx.concatenate(
+    DIST_LIMIT = mx.array(1e10)
+    DIST_LIMIT = mx.repeat(DIST_LIMIT[None, ...], repeats=z_vals[0], axis=0)
+    DIST_LIMIT = mx.expand_dims(DIST_LIMIT, axis=-1)
+    delta_dists = mx.concatenate(
         [
-            dists, 
-            dist_limit
+            delta_dists, 
+            DIST_LIMIT
         ], axis=-1
     )
+    # NOTE: rotate `dists` w.r.t. direction
+    delta_dists = delta_dists * mx.linalg.norm(rays_d[..., None, :], axis=-1)
+    
 
-    return
+    # TODO: --------- double-check below ----------
+
+    # NOTE: compute weight: composed alpha
+    # NOTE: from last paragraph, below eq. (3)
+    # alpha = 1.0 - mx.exp(-nn.relu(raw_alpha) * delta_dists)
+    delta_densities = delta_dists * raw_density
+    alphas = 1.0 - mx.exp(-nn.relu(delta_densities))
+    
+    transmittance = mx.cumsum(delta_densities[..., :-1, :], axis=-2)
+    transmittance = mx.concatenate(
+        [
+            mx.zeros((*transmittance.shape[:1], 1, 1)), 
+            transmittance
+        ], 
+        axis=-2
+    )
+    transmittance = mx.exp(-transmittance)
+    weights = alphas * transmittance
+
+    # TODO: implement each as a renderer
+    rgb_map = mx.sum(weights[..., None] * raw_rgb, axis=-2)
+    depth_map = mx.sum(weights * z_vals, axis=-1)
+    disp_map = 1.0 / mx.max(1e-10 * mx.ones_like(depth_map), depth_map/mx.sum(weights, axis=-1))
+    acc_map = mx.sum(weights, axis=-1)
+
+    if white_bkgd:
+        rgb_map = rgb_map + (1.0 - acc_map[..., None])
+
+    return rgb_map, disp_map, acc_map, weights, depth_map
 
 def decompose_ray_batch(
     rays_batch_linear, # NOTE: [B, rays_o, rays_d, near, far, viewdirs (, time)]
@@ -52,7 +99,7 @@ def decompose_ray_batch(
 
 def render_rays(
     rays_batch_linear, # NOTE: [B, rays_o, rays_d, near, far, viewdirs]
-    network_fn, 
+    network_coarse, 
     network_query_fn, 
     n_depth_samples, 
     retraw=False, 
@@ -80,7 +127,7 @@ def render_rays(
 
     pos = rays_o[..., None, :] + (z_vals[..., :, None] * rays_d[..., None, :]) # TODO: validate
 
-    raw = network_query_fn(pos, viewdirs, network_fn)
+    raw = network_query_fn(pos, viewdirs, network_coarse) # returns [rgb, alpha]
     ret = {}
     if retraw: ret["raw"] = raw
 
@@ -90,6 +137,8 @@ def render_rays(
 
     if N_imporatance <= 0 and True:
         return ret
+    
+    return ret
 
     # TODO: implement fine NeRF below
 
