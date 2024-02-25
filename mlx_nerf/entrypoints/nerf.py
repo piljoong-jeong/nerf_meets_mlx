@@ -20,7 +20,7 @@ from this_project import get_project_root, PJ_PINK
 from mlx_nerf import config_parser
 from mlx_nerf.dataset.dataloader import load_blender_data, validate_dataset
 from mlx_nerf.models.NeRF import create_NeRF
-from mlx_nerf.rendering import ray
+from mlx_nerf.rendering import ray, render
 
 
 def main(
@@ -115,9 +115,46 @@ def main(
         pose = poses[img_i, :3, :4]
         N_rand = args.N_rand
         if not None is N_rand:
-            # TODO: implement
             rays_o, rays_d = ray.get_rays(H, W, K, mx.array(pose))
 
-            print(f"{rays_o.shape=}")
-            print(f"{rays_d.shape=}")
-            exit()
+            rays_o = mx.array(rays_o) # [H, W, 3]
+            rays_d = mx.array(rays_d) # [H, W, 3]
+
+            
+            """
+            TODO: implement shuffling
+            """
+            coords = onp.meshgrid(
+                onp.arange(0, H), 
+                onp.arange(0, W), 
+                indexing="ij"
+            ) # NOTE: `list`
+            
+            # TODO: convert all `np.ndarray`s into `mx.array`
+            coords[0] = mx.array(coords[0])
+            coords[1] = mx.array(coords[1])
+
+            # TODO: stack meshgrids
+            coords = mx.stack(coords, axis=-1)
+            
+            # TODO: reshape, now [H, W] has been flatten
+            coords = mx.reshape(coords, [-1, 2])
+
+            choice = mx.array(onp.random.choice(coords.shape[0], size=[N_rand], replace=False)) # NOTE: [H*W]
+            selected_coords = coords[choice]
+
+            rays_o = rays_o[selected_coords[:, 0], selected_coords[:, 1]]
+            rays_d = rays_d[selected_coords[:, 0], selected_coords[:, 1]]
+
+            batch_rays = mx.stack([rays_o, rays_d], axis=0)
+            target_selected = target[selected_coords[:, 0], selected_coords[:, 1]]
+        else:
+            raise NotImplementedError
+
+        rgb, disp, acc, extras = render.render(
+            H, W, K, 
+            args.chunk, 
+            batch_rays, 
+            # retraw=True, 
+            **render_kwargs_train
+        )

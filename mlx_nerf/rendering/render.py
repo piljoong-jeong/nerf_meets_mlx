@@ -5,6 +5,7 @@ Execution flow:
     1. render(...)
     2. batchify_rays(...)
     3. render_rays(...)
+    4. raw2outputs(...)
 """
 
 import mlx.core as mx
@@ -134,6 +135,9 @@ def render_rays(
     rgb_coarse, disp_coarse, acc_coarse, weights, depth_map = raw2outputs(
         raw, z_vals, rays_d, raw_noise_std, white_bkgd, pytest
     )
+    ret["rgb_map"] = rgb_coarse
+    ret["disp_map"] = disp_coarse
+    ret["acc_map"] = acc_coarse
 
     if N_imporatance <= 0 and True:
         return ret
