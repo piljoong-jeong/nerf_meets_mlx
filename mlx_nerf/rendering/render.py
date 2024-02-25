@@ -25,10 +25,13 @@ def raw2outputs(
     # NOTE: relative distance
     dists = z_vals[..., 1:] - z_vals[..., :-1] # NOTE: [B, n_depth_samples-1]
     # NOTE: add infinite value at the end of `dists`
+    dist_limit = mx.array(1e10)
+    dist_limit = mx.repeat(dist_limit[None, ...], repeats=z_vals[0], axis=0)
+    dist_limit = mx.expand_dims(dist_limit, axis=-1)
     dists = mx.concatenate(
         [
             dists, 
-            mx.expand_dims(mx.repeat(mx.array([1e10])[None, ...], repeats=z_vals[0], axis=0), axis=-1)
+            dist_limit
         ], axis=-1
     )
 
