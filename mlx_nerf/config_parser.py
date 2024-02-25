@@ -33,7 +33,7 @@ def config_parser():
 
     # NOTE: rendering options
     # ------------------------------------------
-    parser.add_argument("--N_samples", type=int, default=64, help="number of coarse samples per ray")
+    parser.add_argument("--n_depth_samples", type=int, default=64, help="number of coarse samples per ray")
     parser.add_argument("--N_importance", type=int, default=0, help="number of additional fine samples per ray")
     parser.add_argument("--perturb", type=float, default=1., help="set to 0. for no jitter, 1. for jitter")
     parser.add_argument("--use_viewdirs", action="store_true", help="use full 5D input instead of 3D")
@@ -111,7 +111,7 @@ def update_NeRF_args(args: argparse.Namespace, configs: dict):
     args.use_viewdirs = configs['use_viewdirs']
     args.white_bkgd = configs['white_bkgd']
     args.lrate_decay = int(configs['lrate_decay'])
-    args.N_samples = int(configs['N_samples'])
+    args.n_depth_samples = int(configs['N_samples'])
     args.N_importance = int(configs['N_importance'])
     args.N_rand = int(configs['N_rand'])
     args.precrop_iters = int(configs['precrop_iters'])

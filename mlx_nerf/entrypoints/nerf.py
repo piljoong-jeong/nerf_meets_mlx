@@ -44,7 +44,7 @@ def main(
     args.use_viewdirs = configs['use_viewdirs']
     args.white_bkgd = configs['white_bkgd']
     args.lrate_decay = int(configs['lrate_decay'])
-    args.N_samples = int(configs['N_samples'])
+    args.n_depth_samples = int(configs['N_samples'])
     args.N_importance = int(configs['N_importance'])
     args.N_rand = int(configs['N_rand'])
     args.precrop_iters = int(configs['precrop_iters'])
@@ -158,3 +158,5 @@ def main(
             # retraw=True, 
             **render_kwargs_train
         )
+
+        return

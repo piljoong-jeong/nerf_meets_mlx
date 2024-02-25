@@ -106,7 +106,7 @@ def render_rays(
     retraw=False, 
     lindisp=False, 
     perturb=0.0, 
-    N_imporatance=0, 
+    N_importance=0, 
     network_fine=None, 
     white_bkgd=False, 
     raw_noise_std=0.0, 

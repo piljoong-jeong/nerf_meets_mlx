@@ -52,7 +52,7 @@ def create_NeRF(args):
     octave_pos = args.multires
     octave_dir = args.multires_views
     is_use_dir = args.use_viewdirs
-    n_samples = args.N_samples
+    n_samples = args.n_depth_samples
     n_importance_samples = args.N_importance
     learning_rate = args.lrate
     perturb = args.perturb
@@ -128,7 +128,7 @@ def create_NeRF(args):
         
         # NOTE: coarse
         "network_coarse": model, 
-        "N_samples": n_samples, # NOTE: num. uniform samples
+        "n_depth_samples": n_samples, # NOTE: num. uniform samples
 
         # NOTE: fine
         "network_fine": model_fine, 
