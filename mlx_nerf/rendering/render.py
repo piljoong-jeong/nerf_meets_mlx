@@ -11,6 +11,8 @@ import mlx.core as mx
 
 from mlx_nerf.rendering import ray
 from mlx_nerf.sampling import uniform
+from mlx_nerf import sampling
+from mlx_nerf.sampling import uniform, linear_disparity
 
 def decompose_ray_batch(
     rays_batch_linear, # NOTE: [B, rays_o, rays_d, near, far, viewdirs (, time)]
@@ -29,7 +31,7 @@ def render_rays(
     rays_batch_linear, # NOTE: [B, rays_o, rays_d, near, far, viewdirs]
     network_fn, 
     network_query_fn, 
-    n_samples, 
+    n_depth_samples, 
     retraw=False, 
     lindisp=False, 
     perturb=0.0, 
@@ -45,7 +47,28 @@ def render_rays(
     rays_o, rays_d, near, far, viewdirs, _ = decompose_ray_batch(rays_batch_linear)
 
     # NOTE: sample z-values for coarse NeRF
-    z_vals = uniform.uniform_sample_z(near, far, n_samples)
+    if not lindisp:
+        z_vals = uniform.sample_z(near, far, n_depth_samples)
+    else:
+        z_vals = linear_disparity.sample_z(near, far, n_depth_samples)
+    # TODO: use `expand` when `mlx` implements it - `repeat` copies data but `expand` provides view
+    z_vals = mx.repeat(z_vals[None, ...], repeats=n_rays, axis=0)
+    z_vals = sampling.add_noise_z(z_vals, perturb)
+
+    pos = rays_o[..., None, :] + (z_vals[..., :, None] * rays_d[..., None, :]) # TODO: validate
+
+    raw = network_query_fn(pos, viewdirs, network_fn)
+    ret = {}
+    if retraw: ret["raw"] = raw
+
+    rgb_coarse, disp_coarse, acc_coarse, weights, depth_map = raw2outputs(
+        raw, z_vals, rays_d, raw_noise_std, white_bkgd, pytest
+    )
+
+    if N_imporatance <= 0 and True:
+        return ret
+
+    # TODO: implement fine NeRF below
 
     return
 

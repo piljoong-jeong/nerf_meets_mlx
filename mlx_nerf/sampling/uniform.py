@@ -1,6 +1,10 @@
+"""### uniform.py
+###### in `mlx_nerf/sampling`
+"""
+
 import mlx.core as mx
 
-def uniform_sample_z(
+def sample_z(
     near: float, 
     far: float, 
     n_samples: int, 
