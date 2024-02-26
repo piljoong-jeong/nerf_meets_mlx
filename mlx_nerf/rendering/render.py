@@ -124,7 +124,7 @@ def render_rays(
     else:
         z_vals = linear_disparity.sample_z(near, far, n_depth_samples)
     # TODO: use `expand` when `mlx` implements it - `repeat` copies data but `expand` provides view
-    z_vals = mx.repeat(z_vals[None, ...], repeats=n_rays, axis=0)
+    # z_vals = mx.repeat(z_vals[None, ...], repeats=n_rays, axis=0) # FIXME: validate: [n_rays, n_depth_samples] -> [n_rays, n_rays, n_depth_samples]
     z_vals = sampling.add_noise_z(z_vals, perturb)
 
     pos = rays_o[..., None, :] + (z_vals[..., :, None] * rays_d[..., None, :]) # TODO: validate
