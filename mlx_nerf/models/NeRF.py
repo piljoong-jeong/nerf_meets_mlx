@@ -14,7 +14,7 @@ def inference_wrapper_batch(model, chunk):
     def __batched_model_inference(inputs_embedded):
         return mx.concatenate(
             [
-                model(inputs_embedded[i:i+chunk])
+                model.forward(inputs_embedded[i:i+chunk])
                 for i in range(0, inputs_embedded.shape[0], chunk)
             ], axis=0
         )
