@@ -179,7 +179,7 @@ class NeRF(nn.Module):
         ]
         # fmt: on
 
-        if True is is_use_view_directions:
+        if self.is_use_view_directions:
             self.list_linears_dir = [nn.Linear(width_layers+channel_input_views, width_layers//2)]
             self.feature_linear = nn.Linear(width_layers, width_layers) # NOTE: last layer
             self.alpha_linear = nn.Linear(width_layers, 1)
@@ -197,7 +197,8 @@ class NeRF(nn.Module):
         if self.is_use_view_directions:
             list_pos_dir = mx.split(
                 x, 
-                indices_or_sections=[self.channel_input_pos, self.channel_input_dir], 
+                # indices_or_sections=[self.channel_input_pos, self.channel_input_dir], 
+                indices_or_sections=[self.channel_input_pos], 
                 axis=-1
             )
             input_pos = list_pos_dir[0]
