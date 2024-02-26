@@ -92,7 +92,7 @@ def decompose_ray_batch(
     
     rays_o, rays_d = rays_batch_linear[:, 0:3], rays_batch_linear[:, 3:6]
     
-    bounds = mx.reshape(rays_batch_linear[..., 6:8], [-1, 1, 3])
+    bounds = mx.reshape(rays_batch_linear[..., 6:9], [-1, 1, 3])
     near, far = bounds[..., 0], bounds[..., 1]
     viewdirs = rays_batch_linear[:, 8:11]
     frame_time = bounds[..., 2] if is_time_included else None

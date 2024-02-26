@@ -159,4 +159,6 @@ def main(
             **render_kwargs_train
         )
 
+        print(f"[DEBUG] rendered {rgb.shape=}")
+
         return
