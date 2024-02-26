@@ -195,11 +195,13 @@ class NeRF(nn.Module):
     ):
 
         if self.is_use_view_directions:
-            input_pos, input_dir = mx.split(
+            list_pos_dir = mx.split(
                 x, 
                 indices_or_sections=[self.channel_input_pos, self.channel_input_dir], 
                 axis=-1
             )
+            input_pos = list_pos_dir[0]
+            input_dir = list_pos_dir[1]
         else:
             input_pos = x
 
