@@ -27,7 +27,11 @@ def run_model(
     model, 
     netchunk = 64*1024
 ):
+    assert len(pos.shape) == 3, f"[ERROR] {pos.shape=} should have dimensions as: [n_rays, n_depth_samples, 3d position]!"
+    B = pos.shape[0]; n=pos.shape[1]
     # NOTE: embed `pos` & `dir`, and concatenate
+    # TODO: dimension mismatch: pos=[B, n, c] != dir=[B, c]
+    # TODO: or check if it's OK as `dirs_flat` becomes shape with `pos_flat` by `embedding.embed`
     inputs_embedded = embedding.embed(pos, embed_pos, dir, embed_dir)
 
     # NOTE: batched inference & concatenate per batch
@@ -38,7 +42,7 @@ def run_model(
     return (
         outputs := mx.reshape(
             outputs_flat, 
-            list(inputs_embedded.shape[-1]) + [outputs_flat.shape[-1]]
+            [B, n, outputs_flat.shape[-1]] # TODO: double-check
         )
     )
 

@@ -13,8 +13,6 @@ def embed(pos, embed_pos, dir, embed_dir):
         # NOTE: return embedded points only
         result = embedded_pos
     else:
-        # TODO: check: `dir.shape`
-        # dirs = dir[:, None].expand(pos.shape)
         dirs = mx.repeat(dir[:, None, :], repeats=pos.shape[1], axis=1)
         dir_flat = mx.reshape(dirs, [-1, dirs.shape[-1]])
         embedded_dir = embed_dir(dir_flat)
