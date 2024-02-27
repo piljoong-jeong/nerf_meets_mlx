@@ -31,8 +31,9 @@ def raw2outputs(
     """
 
     # NOTE: decompose `raw`
-    raw_rgb = raw[..., :3]
-    raw_density = raw[..., 3]
+    raw_rgb = raw[..., :3] # NOTE: dim = [B, n, 3]
+    raw_density = raw[..., 3] # NOTE: dim = [B, n]
+    # raw_density = mx.expand_dims(raw_density, axis=-1) # NOTE: dim = [B, n, 1]
 
     # NOTE: add noise if desired, to avoid overfitting
     if raw_noise_std > 0.0:
@@ -43,16 +44,17 @@ def raw2outputs(
     delta_dists = z_vals[..., 1:] - z_vals[..., :-1] # NOTE: [B, n_depth_samples-1]
     # NOTE: add infinite value at the end of `dists`
     DIST_LIMIT = mx.array(1e10)
-    DIST_LIMIT = mx.repeat(DIST_LIMIT[None, ...], repeats=z_vals.shape[0], axis=0) 
+    DIST_LIMIT = mx.repeat(DIST_LIMIT[None, ...], repeats=z_vals.shape[0], axis=0) # [B, 1]
     DIST_LIMIT = mx.expand_dims(DIST_LIMIT, axis=-1)
     delta_dists = mx.concatenate(
         [
             delta_dists, 
             DIST_LIMIT
         ], axis=-1
-    )
+    ) # [B, n]
     # NOTE: rotate `dists` w.r.t. direction
-    delta_dists = delta_dists * mx.linalg.norm(rays_d[..., None, :], axis=-1)
+    # delta_dists = mx.expand_dims(delta_dists, axis=-1)
+    delta_dists = delta_dists * mx.linalg.norm(rays_d[..., None, :], axis=-1) # [B, n]
     
 
     # TODO: --------- double-check below ----------
@@ -60,10 +62,11 @@ def raw2outputs(
     # NOTE: compute weight: composed alpha
     # NOTE: from last paragraph, below eq. (3)
     # alpha = 1.0 - mx.exp(-nn.relu(raw_alpha) * delta_dists)
-    delta_densities = delta_dists * raw_density
-    alphas = 1.0 - mx.exp(-nn.relu(delta_densities))
+    delta_densities = delta_dists * raw_density # [B, n]
+    delta_densities = mx.expand_dims(delta_densities, axis=-1)
+    alphas = 1.0 - mx.exp(-nn.relu(delta_densities)) # [B, n]
     
-    transmittance = mx.cumsum(delta_densities[..., :-1, :], axis=-2)
+    transmittance = mx.cumsum(delta_densities[..., :-1, :], axis=-2) # FIXME: [B-1, n]???
     transmittance = mx.concatenate(
         [
             mx.zeros((*transmittance.shape[:1], 1, 1)), 
@@ -72,16 +75,21 @@ def raw2outputs(
         axis=-2
     )
     transmittance = mx.exp(-transmittance)
-    weights = alphas * transmittance
+    weights = alphas * transmittance # [B, n, 1]
 
     # TODO: implement each as a renderer
-    rgb_map = mx.sum(weights[..., None] * raw_rgb, axis=-2)
-    depth_map = mx.sum(weights * z_vals, axis=-1)
-    disp_map = 1.0 / mx.max(1e-10 * mx.ones_like(depth_map), depth_map/mx.sum(weights, axis=-1))
-    acc_map = mx.sum(weights, axis=-1)
+    rgb_map = mx.sum(weights * raw_rgb, axis=-2) # [B, 3]
+    depth_map = mx.sum(weights[..., 0] * z_vals, axis=-1)[..., None] # [B, 1]
+    disp_map = 1.0 / mx.maximum(
+        1e-10 * mx.ones_like(depth_map), 
+        depth_map/mx.sum(weights, axis=-2)
+    ) # [B, 1]
+    acc_map = mx.sum(weights, axis=-2) # [B, 1]
 
     if white_bkgd:
-        rgb_map = rgb_map + (1.0 - acc_map[..., None])
+        rgb_map = rgb_map + (1.0 - acc_map) # TODO: validate
+
+    
 
     return rgb_map, disp_map, acc_map, weights, depth_map
 
@@ -228,7 +236,7 @@ def render(
     k_extract = ["rgb_map", "disp_map", "acc_map"]
     ret_list = [results_batched[k] for k in k_extract]
     ret_dict = {
-        k: v for k, v in results_batched
+        k: v for k, v in results_batched.items()
         if k not in k_extract
     }
 
