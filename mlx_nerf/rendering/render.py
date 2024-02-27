@@ -186,6 +186,7 @@ def render(
     K, 
     chunk=1024*32, 
     rays=None,
+    c2w=None, 
     ndc=True, 
     near=0.0, 
     far=1.0,
@@ -194,18 +195,34 @@ def render(
     **kwargs
 ):
 
-    rays_o, rays_d = rays
+    if c2w is None and rays is not None:
+        rays_o, rays_d = rays
+    elif c2w is not None:
+        rays_o, rays_d = ray.get_rays(H, W, K, c2w)
+        rays_o = mx.array(rays_o)
+        rays_d = mx.array(rays_d)
+
+    rays_shape = rays_d.shape
+
+    if c2w is not None:
+        rays_o = mx.reshape(rays_o, [-1, 3]).astype(mx.float32)
+        rays_d = mx.reshape(rays_d, [-1, 3]).astype(mx.float32)
 
     if use_viewdirs:
         viewdirs = rays_d
+
+        # NOTE: if `c2w` is given, we generate rays from given view on demand
         if c2w_staticcam is not None:
             rays_o, rays_d = ray.get_rays(H, W, K, c2w_staticcam)
             rays_o = mx.array(rays_o)
             rays_d = mx.array(rays_d)
+            # TODO: validate
+            rays_o = mx.reshape(rays_o, [-1, 3]).astype(mx.float32)
+            rays_d = mx.reshape(rays_d, [-1, 3]).astype(mx.float32)
         viewdirs = viewdirs / mx.linalg.norm(viewdirs, axis=-1, keepdims=True)
         viewdirs = mx.reshape(viewdirs, [-1, 3]).astype(mx.float32)
 
-    rays_shape = rays_d.shape
+    
 
     if ndc:
         rays_o, rays_d = ray.ndc_rays(
@@ -230,7 +247,7 @@ def render(
     for key, val in results_batched.items():
         results_batched[key] = mx.reshape(
             val, 
-            list(rays_shape[:-1]) + list(val.shape[1:])
+            tuple(list(rays_shape[:-1]) + list(val.shape[1:]))
         )
 
     k_extract = ["rgb_map", "disp_map", "acc_map"]

@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import List, Optional, Tuple, Union
 from PIL import Image
 
-import imageio.v2 as imageio
+import imageio.v2
 import numpy as onp
 import matplotlib.pyplot as plt
 import mlx.core as mx
@@ -36,7 +36,7 @@ def main(
     path_config = path_dataset / args.config
     
     configs = config_parser.load_config(None, path_config)
-    pprint.pprint(configs)
+    # pprint.pprint(configs)
     args.expname = configs['expname']
     args.basedir = configs['basedir']
     args.datadir = configs['datadir']
@@ -135,9 +135,10 @@ def main(
             file.write(open(path_config, "r").read())
 
     N_iters = 20000
+    list_losses = []
+    list_iters = []
 
-
-    for i in trange(0, N_iters):
+    for i in trange(1, N_iters+1):
         # NOTE: randomize rays
         img_i = onp.random.choice(i_train)
         target = images[img_i]
@@ -186,4 +187,38 @@ def main(
 
         # print(f"[DEBUG] iter={i:06d} \t | loss={loss.item()=:0.6f}")
 
-        
+        list_iters.append(i)
+        list_losses.append(loss.item())
+
+    rgb, _, _, _ = render.render(
+        H, W, K, 
+        c2w=(testpose := mx.array(poses[len(poses)//2]))[:3, :4], 
+        **render_kwargs_test
+    )
+
+    fig = plt.figure(figsize=(10, 4))
+    ax1 = fig.add_subplot(1, 2, 1)
+    ax1.set_title("Loss validation")
+    ax1.set_ylim(0, 1.0)
+    ax1.plot(list_iters, list_losses)
+    ax2 = fig.add_subplot(1, 2, 2)
+    to8b = lambda x: onp.array((mx.clip(x, 0.0, 1.0) * 255.0), copy=False).astype(onp.uint8)
+    ax2.imshow(to8b(rgb))
+
+    print(f"[DEBUG] saving video...")
+    writer = imageio.v2.get_writer(os.path.join("results", f"iter={i}.mp4"), fps=60)
+    for i in trange(render_poses.shape[0]):
+        render_pose = render_poses[i]
+        rgb, _, _, _ = render.render(
+            H, W, K, 
+            c2w=render_pose[:3, :4], 
+            **render_kwargs_test
+        )
+        writer.append_data(
+            onp.hstack([
+                to8b(rgb), 
+            ])
+        )
+    writer.close()
+    
+    fig.savefig(f"results/iter={i}.png")
