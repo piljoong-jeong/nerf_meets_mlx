@@ -153,7 +153,7 @@ def render_rays(
     
     return ret
 
-    # TODO: implement fine NeRF below
+    # TODO: --------------------- implement fine NeRF below
 
     return
 

@@ -2,6 +2,7 @@ import json
 import pprint
 import os
 import time
+from functools import partial
 from pathlib import Path
 from typing import List, Optional, Tuple, Union
 from PIL import Image
@@ -57,6 +58,34 @@ def main(
 
     render_kwargs_train, render_kwargs_test, idx_iter, optimizer = create_NeRF(args)
 
+
+    def mlx_mse(model, batch_rays, y_gt):
+        """
+        FIXME: 
+        """
+
+        rgb, disp, acc, extras = render.render(
+            H, W, K, 
+            args.chunk, 
+            batch_rays, 
+            # retraw=True, 
+            **render_kwargs_train
+        )
+
+        mse = mx.mean((rgb - y_gt) ** 2)
+
+        result = mse
+        return result
+
+    state = [render_kwargs_train["network_coarse"].state, optimizer.state]
+    @partial(mx.compile, inputs=state, outputs=state)
+    def step(X, y):
+        model = render_kwargs_train["network_coarse"]
+        loss_and_grad_fn = nn.value_and_grad(model, mlx_mse)
+        loss, grads = loss_and_grad_fn(model, X, y)
+        optimizer.update(model, grads)
+        return loss
+
     # NOTE: ---------------- from `train(args)` --------------------    
     i_train, i_val, i_test = i_split
 
@@ -105,7 +134,8 @@ def main(
         with open(f, "w") as file:
             file.write(open(path_config, "r").read())
 
-    N_iters = 200000+1
+    N_iters = 20000
+
 
     for i in trange(0, N_iters):
         # NOTE: randomize rays
@@ -151,14 +181,9 @@ def main(
         else:
             raise NotImplementedError
 
-        rgb, disp, acc, extras = render.render(
-            H, W, K, 
-            args.chunk, 
-            batch_rays, 
-            # retraw=True, 
-            **render_kwargs_train
-        )
+        loss = step(batch_rays, target_selected)
+        mx.eval(state)
 
-        print(f"[DEBUG] rendered {rgb.shape=}")
+        # print(f"[DEBUG] iter={i:06d} \t | loss={loss.item()=:0.6f}")
 
-        return
+        

@@ -82,7 +82,7 @@ def create_NeRF(args):
     n_layers = args.netdepth
     width_layers = args.netwidth
     # fmt: off
-    model = NeRF(
+    model_coarse = NeRF(
         n_layers=n_layers, 
         width_layers=width_layers, 
         channel_input=channel_emb_pos, 
@@ -91,6 +91,7 @@ def create_NeRF(args):
         channel_input_views=channel_emb_dir, 
         is_use_view_directions=is_use_dir
     )
+    mx.eval(model_coarse.parameters())
     # fmt: on
     # TODO: deal with `grad_vars` in `loss_and_grad_fn`
     # grad_vars = list(model.parameters())
@@ -113,6 +114,7 @@ def create_NeRF(args):
     if not None is model_fine:
         # TODO: deal with `grad_vars` in `loss_and_grad_fn`
         # grad_vars += list(model_fine.parameters())
+        mx.eval(model_fine.parameters())
         pass
 
     # FIXME: `mx.optimizers` does not accept `params`!
@@ -131,7 +133,7 @@ def create_NeRF(args):
         "network_query_fn": network_query_fn, 
         
         # NOTE: coarse
-        "network_coarse": model, 
+        "network_coarse": model_coarse, 
         "n_depth_samples": n_samples, # NOTE: num. uniform samples
 
         # NOTE: fine
