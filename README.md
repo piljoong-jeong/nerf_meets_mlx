@@ -30,4 +30,18 @@ $ python mlx_nerf
 # Implementations
 
 ## Image Learning
+
 ![image_learning](assets/doc/image_learning.gif)
+
+## Volume Learning
+
+Implementation of Neural Radiance Fields [ECCV2020]. <p>
+
+Work in Progress.
+
+- [x] Coarse NeRF learning
+- [ ] Importance Sampling from coarse NeRF's transmittance
+- [ ] Fine NeRF learning
+- [ ] Learning rate decaying scheme
+
+![volume_learning](assets/doc/volume_learning_lego_iter=2000.gif)
