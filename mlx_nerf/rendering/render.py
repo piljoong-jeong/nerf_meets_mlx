@@ -43,7 +43,7 @@ def raw2outputs(
     delta_dists = z_vals[..., 1:] - z_vals[..., :-1] # NOTE: [B, n_depth_samples-1]
     # NOTE: add infinite value at the end of `dists`
     DIST_LIMIT = mx.array(1e10)
-    DIST_LIMIT = mx.repeat(DIST_LIMIT[None, ...], repeats=z_vals[0], axis=0)
+    DIST_LIMIT = mx.repeat(DIST_LIMIT[None, ...], repeats=z_vals.shape[0], axis=0) 
     DIST_LIMIT = mx.expand_dims(DIST_LIMIT, axis=-1)
     delta_dists = mx.concatenate(
         [
