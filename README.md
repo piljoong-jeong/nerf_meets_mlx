@@ -38,7 +38,7 @@ $ python mlx_nerf
 Implementation of Neural Radiance Fields [ECCV2020]. <p>
 
 <p align="center">
-    <img src="assets/doc/volume_learning_lego_iter=2000.gif">
+    <img src="assets/doc/volume_learning_lego_iter=20000.gif">
 </p>
 
 Work in Progress.

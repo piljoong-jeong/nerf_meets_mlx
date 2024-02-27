@@ -134,7 +134,7 @@ def main(
         with open(f, "w") as file:
             file.write(open(path_config, "r").read())
 
-    N_iters = 20000
+    N_iters = 200000
     list_losses = []
     list_iters = []
 
@@ -204,6 +204,7 @@ def main(
     ax2 = fig.add_subplot(1, 2, 2)
     to8b = lambda x: onp.array((mx.clip(x, 0.0, 1.0) * 255.0), copy=False).astype(onp.uint8)
     ax2.imshow(to8b(rgb))
+    fig.savefig(f"results/iter={i}.png")
 
     print(f"[DEBUG] saving video...")
     writer = imageio.v2.get_writer(os.path.join("results", f"iter={i}.mp4"), fps=60)
@@ -221,4 +222,4 @@ def main(
         )
     writer.close()
     
-    fig.savefig(f"results/iter={i}.png")
+    
