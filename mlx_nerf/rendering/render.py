@@ -148,14 +148,11 @@ def render_rays(
     ret["disp_map"] = disp_coarse
     ret["acc_map"] = acc_coarse
 
-    if N_importance <= 0 and True:
-        return ret
+    # NOTE: for importance sampling
+    ret["z_vals"] = z_vals
+    ret["weights"] = weights
     
     return ret
-
-    # TODO: --------------------- implement fine NeRF below
-
-    return
 
 def batchify_rays(
     rays_linear, 
