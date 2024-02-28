@@ -77,10 +77,20 @@ def main(
         result = mse
         return result
 
-    state = [render_kwargs_train["network_coarse"].state, optimizer.state]
-    @partial(mx.compile, inputs=state, outputs=state)
-    def step(X, y):
+    state_coarse = [render_kwargs_train["network_coarse"].state, optimizer.state]
+    @partial(mx.compile, inputs=state_coarse, outputs=state_coarse)
+    def step_coarse(X, y):
         model = render_kwargs_train["network_coarse"]
+        loss_and_grad_fn = nn.value_and_grad(model, mlx_mse)
+        loss, grads = loss_and_grad_fn(model, X, y)
+        optimizer.update(model, grads)
+        return loss
+    
+
+    state_fine = [render_kwargs_train["network_fine"].state, optimizer.state]
+    @partial(mx.compile, inputs=state_fine, outputs=state_fine)
+    def step_fine(X, y):
+        model = render_kwargs_train["network_fine"]
         loss_and_grad_fn = nn.value_and_grad(model, mlx_mse)
         loss, grads = loss_and_grad_fn(model, X, y)
         optimizer.update(model, grads)
@@ -182,8 +192,12 @@ def main(
         else:
             raise NotImplementedError
 
-        loss = step(batch_rays, target_selected)
-        mx.eval(state)
+        loss = step_coarse(batch_rays, target_selected)
+        mx.eval(state_coarse)
+
+        if render_kwargs_train["network_fine"]:
+            loss_fine = step_fine(batch_rays, target_selected)
+            mx.eval(state_fine)
 
         # print(f"[DEBUG] iter={i:06d} \t | loss={loss.item()=:0.6f}")
 
