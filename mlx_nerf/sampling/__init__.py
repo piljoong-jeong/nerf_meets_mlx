@@ -72,12 +72,19 @@ def sample_from_inverse_cdf(
     z_mid_to = mx.take(z_vals_mid, indices=above, axis=-1)
 
     # NOTE: calculate importance
+    t_numerator = u_vals - cdf_grid_from
+    t_denominator = cdf_grid_to - cdf_grid_from
+    t_denominator = mx.where(
+        t_denominator < eps, 
+        mx.ones_like(t_denominator), # NOTE: as this is denominator, set 1 to do nothing
+        t_denominator
+    )
     t_vals = mx.clip(
         (
-            (u_vals - cdf_grid_from) / 
-            mx.minimum(cdf_grid_to - cdf_grid_from, eps)
+            t_numerator / 
+            t_denominator
         ), 
-         0, 1
+        a_min=0.0, a_max=1.0
     )
     z_vals = z_mid_from + t_vals * (z_mid_to - z_mid_from)
 
