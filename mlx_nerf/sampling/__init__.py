@@ -63,4 +63,22 @@ def sample_from_inverse_cdf(
 
     # TODO: check if it's OK to use numpy's implementation; I guess so as no grad would be generated, but just to make sure...
     inds = onp.searchsorted(onp.array(cdf, copy=False), u_vals, side="right")
+    # NOTE: clamp indices
+    below = mx.clip(inds-1, 0, cdf.shape[-1]-1)
+    above = mx.clip(inds-0, 0, cdf.shape[-1]-1)
+    cdf_grid_from = mx.take(cdf, indices=below, axis=-1)
+    cdf_grid_to = mx.take(cdf, indices=above, axis=-1)
+    z_mid_from = mx.take(z_vals_mid, indices=below, axis=-1)
+    z_mid_to = mx.take(z_vals_mid, indices=above, axis=-1)
 
+    # NOTE: calculate importance
+    t_vals = mx.clip(
+        (
+            (u_vals - cdf_grid_from) / 
+            mx.minimum(cdf_grid_to - cdf_grid_from, eps)
+        ), 
+         0, 1
+    )
+    z_vals = z_mid_from + t_vals * (z_mid_to - z_mid_from)
+
+    return z_vals
