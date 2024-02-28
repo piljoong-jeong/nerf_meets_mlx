@@ -1,18 +1,16 @@
 import numpy as onp
 import mlx.core as mx
 
-__all__ = ["add_noise_z"]
+__all__ = ["add_noise_z", "sample_from_inverse_cdf"]
 
 def add_noise_z(
     z_vals, 
-    perturb=0.0 # TODO: refactor out
+    strength=1.0 # TODO: refactor out
 ):
-    
-    # TODO: refactor out
-    if perturb <= 0.0:
+    if strength <= 0.0:
         return z_vals
     
-    t_rand = mx.random.uniform(shape=z_vals.shape)
+    t_rand = mx.random.uniform(shape=z_vals.shape) * strength
 
     # NOTE: [mid(0, 1), mid(1, 2), ...]
     mids = 0.5 * (z_vals[..., :-1] + z_vals[..., 1:])
@@ -28,11 +26,12 @@ def add_noise_z(
 
     return z_vals
 
+# TODO: can this be stand as an independent sampler? 
 def sample_from_inverse_cdf(
     z_vals, 
     weights, 
     n_importance_samples, 
-    eps = 1e-5, 
+    eps=1e-5, 
     is_stratified_sampling=False, 
 ):
     z_vals_mid = (z_vals[..., 1:] + z_vals[..., :-1]) / 2
@@ -50,12 +49,11 @@ def sample_from_inverse_cdf(
         ], axis=-1
     ) # [B, n_samples]
 
-    # NOTE: similar with `t_vals` seen in samplers, but named as `u_vals` to indicate they're importance-sampled ones
+    # NOTE: similar with `t_vals` seen in samplers, but named as `u_vals` to indicate this is importance-sampled ones
     u_vals = None
     if is_stratified_sampling:
         u_vals = mx.linspace(0.0, 1.0, num=n_importance_samples)
         u_vals = mx.repeat(u_vals[None, ...], repeats=cdf.shape[0], axis=0) # TODO: double-check
-
     else: # NOTE: uniform sampling
         u_vals = mx.random.normal(
             tuple(list(cdf.shape[:-1]) + list(n_importance_samples))

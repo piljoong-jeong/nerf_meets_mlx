@@ -126,6 +126,7 @@ def render_rays(
     n_rays = rays_batch_linear.shape[0]
     rays_o, rays_d, near, far, viewdirs, _ = decompose_ray_batch(rays_batch_linear)
 
+    # TODO: separate generation of `z_vals` - to allow users to choose which depth sampling they want to use (e.g., uniform, inverse_cdf, ...)
     # NOTE: sample z-values for coarse NeRF
     if not lindisp:
         z_vals = uniform.sample_z(near, far, n_depth_samples)
