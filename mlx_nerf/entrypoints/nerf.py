@@ -32,7 +32,7 @@ def main(
     
     parser = config_parser.config_parser()
     args = parser.parse_args(args=[])
-    args.config = "configs/lego.txt"
+    args.config = "configs/ficus.txt"
     path_config = path_dataset / args.config
     
     configs = config_parser.load_config(None, path_config)
@@ -195,7 +195,7 @@ def main(
         loss = step_coarse(batch_rays, target_selected)
         mx.eval(state_coarse)
 
-        if render_kwargs_train["network_fine"]:
+        if False and render_kwargs_train["network_fine"]:
             loss_fine = step_fine(batch_rays, target_selected)
             mx.eval(state_fine)
 
