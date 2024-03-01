@@ -62,6 +62,10 @@ def main(
     def mlx_mse(model, batch_rays, y_gt):
         """
         FIXME: 
+            - ray generation
+            - ray depth sampling
+            - generate embedded inputs from sampled rays
+            
         """
 
         rgb, disp, acc, extras = render.render(
@@ -71,6 +75,8 @@ def main(
             # retraw=True, 
             **render_kwargs_train
         )
+        z_vals = extras["z_vals"]
+        weights = extras["weights"]
 
         mse = mx.mean((rgb - y_gt) ** 2)
 
