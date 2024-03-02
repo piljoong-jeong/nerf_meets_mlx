@@ -178,6 +178,11 @@ def batchify_rays(
 
     return results_batched
 
+# FIXME: temporary function to test fine network training
+def render_fine():
+
+    return
+
 def render(
     H, 
     W, 
