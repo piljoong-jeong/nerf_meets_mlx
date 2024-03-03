@@ -65,7 +65,7 @@ def main(
             - ray generation
             - ray depth sampling
             - generate embedded inputs from sampled rays
-            
+
         """
 
         rgb, disp, acc, extras = render.render(
@@ -75,12 +75,15 @@ def main(
             # retraw=True, 
             **render_kwargs_train
         )
-        z_vals = extras["z_vals"]
-        weights = extras["weights"]
 
-        mse = mx.mean((rgb - y_gt) ** 2)
+        # NOTE: fine first
+        mse_fine = mx.mean((rgb - y_gt) ** 2)
+        result = mse_fine
+        if "rgb_coarse" in extras:
+            rgb_coarse = extras["rgb_coarse"]
+            mse_coarse = mx.mean((rgb_coarse - y_gt) ** 2)
 
-        result = mse
+            result = result + mse_coarse
         return result
 
     state_coarse = [render_kwargs_train["network_coarse"].state, optimizer.state]
