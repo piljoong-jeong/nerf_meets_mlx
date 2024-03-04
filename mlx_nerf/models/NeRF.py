@@ -92,9 +92,8 @@ def create_NeRF(args):
         is_use_view_directions=is_use_dir
     )
     mx.eval(model_coarse.parameters())
+    # print(f"[DEBUG] {model_coarse=}")
     # fmt: on
-    # TODO: deal with `grad_vars` in `loss_and_grad_fn`
-    # grad_vars = list(model.parameters())
 
 
     # TODO: fine NeRF
@@ -111,10 +110,9 @@ def create_NeRF(args):
         is_use_view_directions=is_use_dir
     ) if n_importance_samples > 0 else None
     # fmt: on
-    if not None is model_fine:
-        # TODO: deal with `grad_vars` in `loss_and_grad_fn`
-        # grad_vars += list(model_fine.parameters())
+    if model_fine:
         mx.eval(model_fine.parameters())
+        # print(f"[DEBUG] {model_fine=}")
         pass
 
     # FIXME: `mx.optimizers` does not accept `params`!
@@ -203,7 +201,6 @@ class NeRF(nn.Module):
         if self.is_use_view_directions:
             list_pos_dir = mx.split(
                 x, 
-                # indices_or_sections=[self.channel_input_pos, self.channel_input_dir], 
                 indices_or_sections=[self.channel_input_pos], 
                 axis=-1
             )

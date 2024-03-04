@@ -121,6 +121,7 @@ def render_rays(
     raw_noise_std=0.0, 
     verbose=False, 
     pytest=False,
+    **kwargs, 
 ):
     
     n_rays = rays_batch_linear.shape[0]
@@ -145,6 +146,9 @@ def render_rays(
     rgb_coarse, disp_coarse, acc_coarse, weights, depth_map = raw2outputs(
         raw, z_vals, rays_d, raw_noise_std, white_bkgd, pytest
     )
+    ret["rgb_map"] = rgb_coarse
+    ret["disp_map"] = disp_coarse
+    ret["acc_map"] = acc_coarse
     ret["rgb_coarse"] = rgb_coarse
     ret["disp_coarse"] = disp_coarse
     ret["acc_coarse"] = acc_coarse
@@ -153,26 +157,26 @@ def render_rays(
     ret["z_vals"] = z_vals
     ret["weights"] = weights
     
-    z_importance_samples = sampling.sample_from_inverse_cdf(
-        z_vals, 
-        weights, 
-        N_importance, 
-    )
-    z_vals = mx.sort(mx.concatenate([z_vals, z_importance_samples], axis=-1), axis=-1) # TODO: double check
-    pts = rays_o[..., None, :] + rays_d[..., None, :] * z_vals[... :, None]
+    # z_importance_samples = sampling.sample_from_inverse_cdf(
+    #     z_vals, 
+    #     weights, 
+    #     N_importance, 
+    # )
+    # z_vals = mx.sort(mx.concatenate([z_vals, z_importance_samples], axis=-1), axis=-1) # TODO: double check
+    # pts = rays_o[..., None, :] + rays_d[..., None, :] * z_vals[... :, None]
 
-    run_fn = network_fine if network_fine else network_coarse
-    raw = network_query_fn(pts, viewdirs, run_fn)
-    rgb, disp, acc, weight, depth = raw2outputs(
-        raw, 
-        z_vals, 
-        rays_d, 
-        raw_noise_std, 
-        white_bkgd
-    )
-    ret["rgb_map"] = rgb
-    ret["disp_map"] = disp
-    ret["acc_map"] = acc
+    # run_fn = network_fine if network_fine else network_coarse
+    # raw = network_query_fn(pts, viewdirs, run_fn)
+    # rgb, disp, acc, weight, depth = raw2outputs(
+    #     raw, 
+    #     z_vals, 
+    #     rays_d, 
+    #     raw_noise_std, 
+    #     white_bkgd
+    # )
+    # ret["rgb_map"] = rgb
+    # ret["disp_map"] = disp
+    # ret["acc_map"] = acc
     
     return ret
 
@@ -277,3 +281,4 @@ def render(
     }
 
     return ret_list + [ret_dict]
+

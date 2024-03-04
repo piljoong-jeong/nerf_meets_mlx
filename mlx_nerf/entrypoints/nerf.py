@@ -15,6 +15,7 @@ import mlx.nn as nn
 import mlx.optimizers as optim
 import viser
 import viser.extras
+from mlx.utils import tree_flatten
 from tqdm import trange
 
 from this_project import get_project_root, PJ_PINK
@@ -22,6 +23,8 @@ from mlx_nerf import config_parser
 from mlx_nerf.dataset.dataloader import load_blender_data, validate_dataset
 from mlx_nerf.models.NeRF import create_NeRF
 from mlx_nerf.rendering import ray, render
+from mlx_nerf.rendering.render import render_rays, raw2outputs
+from mlx_nerf import sampling
 
 
 def main(
@@ -58,8 +61,9 @@ def main(
 
     render_kwargs_train, render_kwargs_test, idx_iter, optimizer = create_NeRF(args)
 
-
-    def mlx_mse(model, batch_rays, y_gt):
+    z_vals = None
+    weights = None
+    def mlx_mse_coarse(model, batch_rays, y_gt):
         """
         FIXME: 
             - ray generation
@@ -68,29 +72,119 @@ def main(
 
         """
 
-        rgb, disp, acc, extras = render.render(
-            H, W, K, 
-            args.chunk, 
-            batch_rays, 
-            # retraw=True, 
-            **render_kwargs_train
+        # rgb, disp, acc, extras = render.render(
+        #     H, W, K, 
+        #     args.chunk, 
+        #     batch_rays, 
+        #     **render_kwargs_train
+        # )
+
+
+        near = render_kwargs_train["near"]
+        far = render_kwargs_train["far"]
+
+        rays_o, rays_d = batch_rays
+        rays_shape = rays_d.shape
+        viewdirs = rays_d
+        viewdirs = viewdirs / mx.linalg.norm(viewdirs, axis=-1, keepdims=True)
+        viewdirs = mx.reshape(viewdirs, [-1, 3]).astype(mx.float32)
+
+        if False: # ndc:
+            rays_o, rays_d = ray.ndc_rays(
+                H, W, K[0][0], 
+                1.0, 
+                rays_o, rays_d
+            )
+
+        near = near * mx.ones_like(rays_d[..., :1])
+        far = far * mx.ones_like(rays_d[..., :1])
+
+        # NOTE: concat all ray-related features
+        rays = mx.concatenate(
+            [rays_o, rays_d, near, far], # FIXME: should `near` and `far` included for every ray tensor?
+            axis=-1
         )
+        
+        rays_linear = mx.concatenate([rays, viewdirs], axis=-1)
+        results = render_rays(rays_linear, **render_kwargs_train)
+
+        rgb = results["rgb_coarse"]
+        # nonlocal z_vals
+        # nonlocal weights
+        # z_vals = results["z_vals"]
+        # weights = results["weights"]
+
+        # NOTE: fine first
+        mse_coarse = mx.mean((rgb - y_gt) ** 2)
+        
+        return mse_coarse
+    
+    optimizer_fine = optim.Adam(learning_rate=args.lrate, betas=(0.9, 0.999))
+    def mlx_mse_fine(model, batch_rays, y_gt): # FIXME: in this way computational graph won't be established
+        
+        N_importance = args.N_importance
+
+
+        near = render_kwargs_train["near"]
+        far = render_kwargs_train["far"]
+
+        rays_o, rays_d = batch_rays
+        rays_shape = rays_d.shape
+        viewdirs = rays_d
+        viewdirs = viewdirs / mx.linalg.norm(viewdirs, axis=-1, keepdims=True)
+        viewdirs = mx.reshape(viewdirs, [-1, 3]).astype(mx.float32)
+
+
+        near = near * mx.ones_like(rays_d[..., :1])
+        far = far * mx.ones_like(rays_d[..., :1])
+
+        # NOTE: concat all ray-related features
+        rays = mx.concatenate(
+            [rays_o, rays_d, near, far], # FIXME: should `near` and `far` included for every ray tensor?
+            axis=-1
+        )
+        
+        rays_linear = mx.concatenate([rays, viewdirs], axis=-1)
+        results = render_rays(rays_linear, **render_kwargs_train)
+        z_vals = results["z_vals"]
+        weights = results["weights"]
+
+        z_importance_samples = sampling.sample_from_inverse_cdf(
+            z_vals, 
+            weights, 
+            N_importance, 
+        )
+        z_vals = mx.sort(mx.concatenate([z_vals, z_importance_samples], axis=-1), axis=-1) # TODO: double check
+        pts = rays_o[..., None, :] + rays_d[..., None, :] * z_vals[... :, None]
+
+        run_fn = render_kwargs_train["network_fine"]
+        network_query_fn = render_kwargs_train["network_query_fn"]
+        white_bkgd=False 
+        raw_noise_std=0.0 
+
+        raw = network_query_fn(pts, viewdirs, run_fn)
+        rgb, disp, acc, weight, depth = raw2outputs(
+            raw, 
+            z_vals, 
+            rays_d, 
+            raw_noise_std, 
+            white_bkgd
+        )
+        ret = {}
+        ret["rgb_fine"] = rgb
+        ret["disp_fine"] = disp
+        ret["acc_fine"] = acc
 
         # NOTE: fine first
         mse_fine = mx.mean((rgb - y_gt) ** 2)
-        result = mse_fine
-        if "rgb_coarse" in extras:
-            rgb_coarse = extras["rgb_coarse"]
-            mse_coarse = mx.mean((rgb_coarse - y_gt) ** 2)
-
-            result = result + mse_coarse
-        return result
+        
+        return mse_fine
 
     state_coarse = [render_kwargs_train["network_coarse"].state, optimizer.state]
     @partial(mx.compile, inputs=state_coarse, outputs=state_coarse)
     def step_coarse(X, y):
         model = render_kwargs_train["network_coarse"]
-        loss_and_grad_fn = nn.value_and_grad(model, mlx_mse)
+        loss_and_grad_fn = nn.value_and_grad(model, mlx_mse_coarse)
         loss, grads = loss_and_grad_fn(model, X, y)
         optimizer.update(model, grads)
         return loss
@@ -100,7 +194,7 @@ def main(
     @partial(mx.compile, inputs=state_fine, outputs=state_fine)
     def step_fine(X, y):
         model = render_kwargs_train["network_fine"]
-        loss_and_grad_fn = nn.value_and_grad(model, mlx_mse)
+        loss_and_grad_fn = nn.value_and_grad(model, mlx_mse_fine)
         loss, grads = loss_and_grad_fn(model, X, y)
         optimizer.update(model, grads)
         return loss
@@ -153,7 +247,7 @@ def main(
         with open(f, "w") as file:
             file.write(open(path_config, "r").read())
 
-    N_iters = 200000
+    N_iters = 200
     list_losses = []
     list_iters = []
 
@@ -170,10 +264,6 @@ def main(
             rays_o = mx.array(rays_o) # [H, W, 3]
             rays_d = mx.array(rays_d) # [H, W, 3]
 
-            
-            """
-            TODO: implement shuffling
-            """
             coords = onp.meshgrid(
                 onp.arange(0, H), 
                 onp.arange(0, W), 
@@ -204,9 +294,12 @@ def main(
         loss = step_coarse(batch_rays, target_selected)
         mx.eval(state_coarse)
 
-        if False and render_kwargs_train["network_fine"]:
+        if render_kwargs_train["network_fine"]:
+
+            mx.disable_compile()
             loss_fine = step_fine(batch_rays, target_selected)
             mx.eval(state_fine)
+            mx.enable_compile()
 
         # print(f"[DEBUG] iter={i:06d} \t | loss={loss.item()=:0.6f}")
 

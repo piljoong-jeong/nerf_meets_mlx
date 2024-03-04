@@ -65,8 +65,8 @@ def sample_from_inverse_cdf(
             list(cdf.shape[:-1]) + [n_importance_samples]
         )
 
-    # TODO: check if it's OK to use numpy's implementation; I guess so as no grad would be generated, but just to make sure...
-    inds = onp.searchsorted(onp.array(cdf, copy=False), u_vals, side="right")
+    # FIXME: https://github.com/ml-explore/mlx/issues/712#issuecomment-1954282098
+    inds = onp.searchsorted(onp.array(cdf, copy=False), u_vals, side="right") 
     # NOTE: clamp indices
     below = mx.clip(inds-1, 0, cdf.shape[-1]-1)
     above = mx.clip(inds-0, 0, cdf.shape[-1]-1)
