@@ -62,7 +62,7 @@ def sample_from_inverse_cdf(
         u_vals = mx.repeat(u_vals[None, ...], repeats=cdf.shape[0], axis=0) # TODO: double-check
     else: # NOTE: uniform sampling
         u_vals = mx.random.normal(
-            tuple(list(cdf.shape[:-1]) + list(n_importance_samples))
+            list(cdf.shape[:-1]) + [n_importance_samples]
         )
 
     # TODO: check if it's OK to use numpy's implementation; I guess so as no grad would be generated, but just to make sure...
