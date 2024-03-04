@@ -1,5 +1,6 @@
 import numpy as onp
 import mlx.core as mx
+import mlx.nn as nn
 
 __all__ = ["add_noise_z", "sample_from_inverse_cdf"]
 
@@ -28,26 +29,31 @@ def add_noise_z(
 
 # TODO: can this be stand as an independent sampler? 
 def sample_from_inverse_cdf(
-    z_vals, 
-    weights, 
+    z_vals, # [B, n]
+    weights, # [B, n, 1]
     n_importance_samples, 
     eps=1e-5, 
     is_stratified_sampling=False, 
 ):
-    z_vals_mid = (z_vals[..., 1:] + z_vals[..., :-1]) / 2
-    weights = weights[..., 1:-1] + eps # [B, n_samples-1]
+    
+    weights = weights[..., 0] + (histogram_padding := 0.01) # [B, n]
     weights_sum = mx.sum(weights, axis=-1, keepdims=True)
+    padding = nn.relu(eps - weights_sum)
+    weights = weights + padding / weights.shape[-1]
+    weights_sum += padding # [B, 1]
 
     # NOTE: PDF is proportional to `weights(=transmittance)`, from geometric probability's perspective
     pdf = weights / weights_sum
-    cdf = mx.cumsum(pdf, axis=-1)
-    cdf = mx.minimum(mx.ones_like(cdf), cdf) # NOTE: clip
+    cdf = mx.minimum(
+        mx.ones_like(pdf), 
+        mx.cumsum(pdf, axis=-1)
+    ) # [B, n]
     cdf = mx.concatenate(
         [
-            mx.zeros_like(cdf[..., 0]), 
+            mx.zeros_like(cdf[..., :1]), 
             cdf
         ], axis=-1
-    ) # [B, n_samples]
+    ) # [B, n+1?] TODO: figure out why - maybe for grid?
 
     # NOTE: similar with `t_vals` seen in samplers, but named as `u_vals` to indicate this is importance-sampled ones
     u_vals = None
@@ -66,6 +72,7 @@ def sample_from_inverse_cdf(
     above = mx.clip(inds-0, 0, cdf.shape[-1]-1)
     cdf_grid_from = mx.take(cdf, indices=below, axis=-1)
     cdf_grid_to = mx.take(cdf, indices=above, axis=-1)
+    z_vals_mid = (z_vals[..., 1:] + z_vals[..., :-1]) / 2 # [B, n_samples-1]
     z_mid_from = mx.take(z_vals_mid, indices=below, axis=-1)
     z_mid_to = mx.take(z_vals_mid, indices=above, axis=-1)
 
