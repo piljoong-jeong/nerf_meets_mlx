@@ -45,5 +45,6 @@ Work in Progress.
 
 - [x] Coarse NeRF learning
 - [ ] Importance Sampling from coarse NeRF's transmittance
+- [ ] Detached Importance Sampling from `mlx` graph computation
 - [ ] Fine NeRF learning
 - [ ] Learning rate decaying scheme
