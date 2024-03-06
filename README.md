@@ -48,3 +48,6 @@ Work in Progress.
 - [ ] Detached Importance Sampling from `mlx` graph computation
 - [ ] Fine NeRF learning
 - [ ] Learning rate decaying scheme
+
+# Resources
+* [NeRF dataset](https://drive.google.com/drive/folders/128yBriW1IG_3NJ5Rp7APSTZsJqdJdfc1)
