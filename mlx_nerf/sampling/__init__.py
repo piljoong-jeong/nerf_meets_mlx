@@ -4,6 +4,7 @@ import mlx.nn as nn
 
 __all__ = ["add_noise_z", "sample_from_inverse_cdf"]
 
+
 def add_noise_z(
     z_vals, 
     strength=1.0 # TODO: refactor out
