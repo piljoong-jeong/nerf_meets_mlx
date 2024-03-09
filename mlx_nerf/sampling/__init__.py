@@ -168,11 +168,9 @@ def sample_from_inverse_cdf_torch(
         torch.ones_like(t_denominator), # NOTE: as this is denominator, set 1 to do nothing
         t_denominator
     )
+    t_vals = torch.nan_to_num(t_numerator / t_denominator, 0)
     t_vals = torch.clip(
-        (
-            t_numerator / 
-            t_denominator
-        ), 
+        t_vals, 
         min=0.0, max=1.0
     )
     z_vals = z_mid_from + t_vals * (z_mid_to - z_mid_from)
