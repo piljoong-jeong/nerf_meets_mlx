@@ -108,6 +108,7 @@ def sample_from_inverse_cdf_torch(
 ) -> torch.Tensor:
     # NOTE: since `mlx` does not have `searchsorted` yet, 
 
+    DEVICE = "mps"
 
     weights = weights[..., 0] + (histogram_padding := 0.01) # [B, n]
     weights_sum = torch.sum(weights, dim=-1, keepdim=True)
@@ -120,13 +121,13 @@ def sample_from_inverse_cdf_torch(
     cdf = torch.min(
         torch.ones_like(pdf), 
         torch.cumsum(pdf, axis=-1)
-    ) # [B, n]
+    ).to(DEVICE) # [B, n]
     cdf = torch.cat(
         [
             torch.zeros_like(cdf[..., :1]), 
             cdf
         ], dim=-1
-    ) # [B, n+1?] TODO: figure out why - maybe for grid?
+    ).to(DEVICE) # [B, n+1?] TODO: figure out why - maybe for grid?
 
     # NOTE: similar with `t_vals` seen in samplers, but named as `u_vals` to indicate this is importance-sampled ones
     u_vals = None
@@ -137,6 +138,7 @@ def sample_from_inverse_cdf_torch(
         u_vals = torch.rand(
             list(cdf.shape[:-1]) + [n_importance_samples] # [B, n_importance_samples]
         )
+    u_vals = u_vals.to(DEVICE)
 
     inds = torch.searchsorted(cdf, u_vals, side="right") 
     # NOTE: clamp indices
@@ -154,7 +156,7 @@ def sample_from_inverse_cdf_torch(
             z_vals_mid, 
             z_vals_mid[..., -1, None]
         ], dim=-1
-    ) 
+    ) # TODO: check if this can lead NaN
     z_mid_from = torch.gather(z_vals_mid, index=below, dim=-1)
     z_mid_to = torch.gather(z_vals_mid, index=above, dim=-1)
 

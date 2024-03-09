@@ -8,8 +8,10 @@ Execution flow:
     4. raw2outputs(...)
 """
 
+import numpy as onp
 import mlx.core as mx
 import mlx.nn as nn
+import torch
 
 from mlx_nerf.rendering import ray
 from mlx_nerf import sampling
@@ -157,26 +159,83 @@ def render_rays(
     ret["z_vals"] = z_vals
     ret["weights"] = weights
     
-    # z_importance_samples = sampling.sample_from_inverse_cdf(
-    #     z_vals, 
-    #     weights, 
-    #     N_importance, 
-    # )
-    # z_vals = mx.sort(mx.concatenate([z_vals, z_importance_samples], axis=-1), axis=-1) # TODO: double check
-    # pts = rays_o[..., None, :] + rays_d[..., None, :] * z_vals[... :, None]
+    return ret
 
-    # run_fn = network_fine if network_fine else network_coarse
-    # raw = network_query_fn(pts, viewdirs, run_fn)
-    # rgb, disp, acc, weight, depth = raw2outputs(
-    #     raw, 
-    #     z_vals, 
-    #     rays_d, 
-    #     raw_noise_std, 
-    #     white_bkgd
-    # )
-    # ret["rgb_map"] = rgb
-    # ret["disp_map"] = disp
-    # ret["acc_map"] = acc
+def render_rays_eval(
+    rays_batch_linear, # NOTE: [B, rays_o, rays_d, near, far, viewdirs]
+    network_coarse, 
+    network_query_fn, 
+    n_depth_samples, 
+    retraw=False, 
+    lindisp=False, 
+    perturb=0.0, 
+    N_importance=0, 
+    network_fine=None, 
+    white_bkgd=False, 
+    raw_noise_std=0.0, 
+    verbose=False, 
+    pytest=False,
+    **kwargs, 
+):
+    
+    n_rays = rays_batch_linear.shape[0]
+    rays_o, rays_d, near, far, viewdirs, _ = decompose_ray_batch(rays_batch_linear)
+
+    # TODO: separate generation of `z_vals` - to allow users to choose which depth sampling they want to use (e.g., uniform, inverse_cdf, ...)
+    # NOTE: sample z-values for coarse NeRF
+    if not lindisp:
+        z_vals = uniform.sample_z(near, far, n_depth_samples)
+    else:
+        z_vals = linear_disparity.sample_z(near, far, n_depth_samples)
+    # TODO: use `expand` when `mlx` implements it - `repeat` copies data but `expand` provides view
+    # z_vals = mx.repeat(z_vals[None, ...], repeats=n_rays, axis=0) # FIXME: validate: [n_rays, n_depth_samples] -> [n_rays, n_rays, n_depth_samples]
+    z_vals = sampling.add_noise_z(z_vals, perturb)
+
+    pos = rays_o[..., None, :] + (z_vals[..., :, None] * rays_d[..., None, :]) # TODO: validate
+
+    raw = network_query_fn(pos, viewdirs, network_coarse) # returns [rgb, alpha]
+    ret = {}
+    if retraw: ret["raw"] = raw
+
+    rgb_coarse, disp_coarse, acc_coarse, weights, depth_map = raw2outputs(
+        raw, z_vals, rays_d, raw_noise_std, white_bkgd, pytest
+    )
+    ret["rgb_map"] = rgb_coarse
+    ret["disp_map"] = disp_coarse
+    ret["acc_map"] = acc_coarse
+    ret["rgb_coarse"] = rgb_coarse
+    ret["disp_coarse"] = disp_coarse
+    ret["acc_coarse"] = acc_coarse
+
+    # NOTE: for importance sampling
+    ret["z_vals"] = z_vals
+    ret["weights"] = weights
+
+    z_vals_torch = torch.from_numpy(onp.array(z_vals)).to("mps")
+    weights_torch = torch.from_numpy(onp.array(weights)).to("mps")
+    z_importance_samples = sampling.sample_from_inverse_cdf_torch(
+        z_vals_torch, 
+        weights_torch, 
+        N_importance, 
+    )
+    z_importance_samples = z_importance_samples.detach().cpu().numpy()
+    z_importance_samples = mx.array(z_importance_samples)
+
+    z_vals = mx.sort(mx.concatenate([z_vals, z_importance_samples], axis=-1), axis=-1) # TODO: double check
+    pts = rays_o[..., None, :] + rays_d[..., None, :] * z_vals[..., :, None]
+
+    run_fn = network_fine if network_fine else network_coarse
+    raw = network_query_fn(pts, viewdirs, run_fn)
+    rgb, disp, acc, weight, depth = raw2outputs(
+        raw, 
+        z_vals, 
+        rays_d, 
+        raw_noise_std, 
+        white_bkgd
+    )
+    ret["rgb_map"] = rgb
+    ret["disp_map"] = disp
+    ret["acc_map"] = acc
     
     return ret
 
@@ -186,9 +245,11 @@ def batchify_rays(
     **kwargs
 ):
     
+    render_rays_func = kwargs["render_rays_func"]
+    
     results_batched = {}
     for i in range(0, rays_linear.shape[0], chunk):
-        results = render_rays(rays_linear[i:i+chunk], **kwargs)
+        results = render_rays_func(rays_linear[i:i+chunk], **kwargs)
 
         # NOTE: accumulate per-batch results to `results_batched`
         for key, val in results.items():

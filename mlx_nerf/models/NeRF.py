@@ -5,6 +5,7 @@ import mlx.nn as nn
 import mlx.optimizers as optim
 
 from mlx_nerf.models import embedding
+from mlx_nerf.rendering.render import render_rays, render_rays_eval
 
 def inference_wrapper_batch(model, chunk):
 
@@ -129,6 +130,8 @@ def create_NeRF(args):
         "use_viewdirs": is_use_dir,
         "white_bkgd": args.white_bkgd, 
         "network_query_fn": network_query_fn, 
+        "is_test": True, 
+        "render_rays_func": render_rays,
         
         # NOTE: coarse
         "network_coarse": model_coarse, 
@@ -149,6 +152,8 @@ def create_NeRF(args):
     render_kwargs_test = render_kwargs_train # TODO: double-check
     render_kwargs_test["perturb"] = False
     render_kwargs_test["raw_noise_std"] = 0
+    render_kwargs_test["is_test"] = False
+    render_kwargs_test["render_rays_func"] = render_rays_eval
 
     return render_kwargs_train, render_kwargs_test, idx_iter, optimizer
 

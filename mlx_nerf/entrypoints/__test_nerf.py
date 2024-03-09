@@ -36,7 +36,7 @@ def main(
     
     parser = config_parser.config_parser()
     args = parser.parse_args(args=[])
-    args.config = "configs/ficus.txt"
+    args.config = "configs/lego.txt"
     path_config = path_dataset / args.config
     
     configs = config_parser.load_config(None, path_config)
@@ -121,13 +121,7 @@ def main(
         return mse_coarse
     
     optimizer_fine = optim.Adam(learning_rate=args.lrate, betas=(0.9, 0.999))
-    def mlx_mse_fine(model, batch_rays, pts, y_gt): # FIXME: in this way computational graph won't be established
-        
-        N_importance = args.N_importance
-
-
-        near = render_kwargs_train["near"]
-        far = render_kwargs_train["far"]
+    def mlx_mse_fine(model, batch_rays, z_vals_fine, y_gt): # FIXME: in this way computational graph won't be established
 
         rays_o, rays_d = batch_rays
         rays_shape = rays_d.shape
@@ -136,37 +130,26 @@ def main(
         viewdirs = mx.reshape(viewdirs, [-1, 3]).astype(mx.float32)
 
 
-        near = near * mx.ones_like(rays_d[..., :1])
-        far = far * mx.ones_like(rays_d[..., :1])
-
-        # NOTE: concat all ray-related features
-        rays = mx.concatenate(
-            [rays_o, rays_d, near, far], # FIXME: should `near` and `far` included for every ray tensor?
-            axis=-1
-        )
         
-        rays_linear = mx.concatenate([rays, viewdirs], axis=-1)
-        results = render_rays(rays_linear, **render_kwargs_train)
-        z_vals = results["z_vals"]
-        weights = results["weights"]
-
-        run_fn = render_kwargs_train["network_fine"]
+        
+        run_fn = model
         network_query_fn = render_kwargs_train["network_query_fn"]
         white_bkgd=False 
         raw_noise_std=0.0 
 
+        pts = rays_o[..., None, :] + rays_d[..., None, :] * z_vals_fine[..., :, None]
         raw = network_query_fn(pts, viewdirs, run_fn)
         rgb, disp, acc, weight, depth = raw2outputs(
             raw, 
-            z_vals, 
+            z_vals_fine, 
             rays_d, 
             raw_noise_std, 
             white_bkgd
         )
         ret = {}
-        ret["rgb_fine"] = rgb
-        ret["disp_fine"] = disp
-        ret["acc_fine"] = acc
+        ret["rgb_map"] = rgb
+        ret["disp_map"] = disp
+        ret["acc_map"] = acc
 
         # NOTE: fine first
         mse_fine = mx.mean((rgb - y_gt) ** 2)
@@ -185,10 +168,10 @@ def main(
 
     state_fine = [render_kwargs_train["network_fine"].state, optimizer_fine.state]
     @partial(mx.compile, inputs=state_fine, outputs=state_fine)
-    def step_fine(batch_rays, pts, y):
+    def step_fine(batch_rays, z_vals_fine, y):
         model = render_kwargs_train["network_fine"]
         loss_and_grad_fn = nn.value_and_grad(model, mlx_mse_fine)
-        loss, grads = loss_and_grad_fn(model, batch_rays, pts, y)
+        loss, grads = loss_and_grad_fn(model, batch_rays, z_vals_fine, y)
         optimizer_fine.update(model, grads)
         return loss
 
@@ -240,7 +223,7 @@ def main(
         with open(f, "w") as file:
             file.write(open(path_config, "r").read())
 
-    N_iters = 200
+    N_iters = 2000
     list_losses = []
     list_iters = []
 
@@ -318,8 +301,8 @@ def main(
             z_vals = results["z_vals"]
             weights = results["weights"]
 
-            z_vals_torch = torch.from_numpy(onp.array(z_vals))
-            weights_torch = torch.from_numpy(onp.array(weights))
+            z_vals_torch = torch.from_numpy(onp.array(z_vals)).to("mps")
+            weights_torch = torch.from_numpy(onp.array(weights)).to("mps")
             
             z_importance_samples = sampling.sample_from_inverse_cdf_torch(
                 z_vals_torch, 
@@ -331,11 +314,11 @@ def main(
             z_importance_samples = mx.array(z_importance_samples)
 
 
-            z_vals = mx.sort(mx.concatenate([z_vals, z_importance_samples], axis=-1), axis=-1) # [B, n_samples + n_importance_samples]
-            pts = rays_o[..., None, :] + rays_d[..., None, :] * z_vals[..., :, None]
+            z_vals_fine = mx.sort(mx.concatenate([z_vals, z_importance_samples], axis=-1), axis=-1) # [B, n_samples + n_importance_samples]
+            
 
             
-            loss_fine = step_fine(batch_rays, pts, target_selected)
+            loss = step_fine(batch_rays, z_vals_fine, target_selected)
             mx.eval(state_fine)
             mx.enable_compile()
 
