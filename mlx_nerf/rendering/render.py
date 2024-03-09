@@ -211,8 +211,9 @@ def render_rays_eval(
     ret["z_vals"] = z_vals
     ret["weights"] = weights
 
-    z_vals_torch = torch.from_numpy(onp.array(z_vals)).to("mps")
-    weights_torch = torch.from_numpy(onp.array(weights)).to("mps")
+    # NOTE: `torch.searchsorted` not supports `mps` backend
+    z_vals_torch = torch.from_numpy(onp.array(z_vals))# .to("mps")
+    weights_torch = torch.from_numpy(onp.array(weights))# .to("mps")
     z_importance_samples = sampling.sample_from_inverse_cdf_torch(
         z_vals_torch, 
         weights_torch, 

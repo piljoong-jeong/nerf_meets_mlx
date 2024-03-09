@@ -108,7 +108,7 @@ def sample_from_inverse_cdf_torch(
 ) -> torch.Tensor:
     # NOTE: since `mlx` does not have `searchsorted` yet, 
 
-    DEVICE = "mps"
+    DEVICE = "cpu"
 
     weights = weights[..., 0] + (histogram_padding := 0.01) # [B, n]
     weights_sum = torch.sum(weights, dim=-1, keepdim=True)
