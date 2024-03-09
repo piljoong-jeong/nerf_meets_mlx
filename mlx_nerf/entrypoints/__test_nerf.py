@@ -223,7 +223,7 @@ def main(
         with open(f, "w") as file:
             file.write(open(path_config, "r").read())
 
-    N_iters = 2000
+    N_iters = 200000
     list_losses = []
     list_iters = []
 
@@ -328,11 +328,12 @@ def main(
         list_iters.append(i)
         list_losses.append(loss.item())
 
-        decay_rate = 0.1
-        decay_steps = args.lrate_decay * 1000
-        new_lrate = args.lrate * (decay_rate ** (i / decay_steps))
-        optimizer.learning_rate = new_lrate
-        optimizer_fine.learning_rate = new_lrate
+        # FIXME: learning failed w/ #iter=2k
+        # decay_rate = 0.1
+        # decay_steps = args.lrate_decay * 1000
+        # new_lrate = args.lrate * (decay_rate ** (i / decay_steps))
+        # optimizer.learning_rate = new_lrate
+        # optimizer_fine.learning_rate = new_lrate
 
 
 
