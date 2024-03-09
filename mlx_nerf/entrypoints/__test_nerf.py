@@ -328,6 +328,14 @@ def main(
         list_iters.append(i)
         list_losses.append(loss.item())
 
+        decay_rate = 0.1
+        decay_steps = args.lrate_decay * 1000
+        new_lrate = args.lrate * (decay_rate ** (i / decay_steps))
+        optimizer.learning_rate = new_lrate
+        optimizer_fine.learning_rate = new_lrate
+
+
+
     rgb, _, _, _ = render.render(
         H, W, K, 
         c2w=(testpose := mx.array(poses[len(poses)//2]))[:3, :4], 
