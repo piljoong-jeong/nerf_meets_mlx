@@ -135,16 +135,26 @@ def sample_from_inverse_cdf_torch(
         u_vals = u_vals.expand(list(cdf.shape[:-1], [n_importance_samples])) # TODO: double-check
     else: # NOTE: uniform sampling
         u_vals = torch.rand(
-            list(cdf.shape[:-1]) + [n_importance_samples]
+            list(cdf.shape[:-1]) + [n_importance_samples] # [B, n_importance_samples]
         )
 
     inds = torch.searchsorted(cdf, u_vals, side="right") 
     # NOTE: clamp indices
-    below = torch.clip(inds-1, 0, cdf.shape[-1]-1)
-    above = torch.clip(inds-0, 0, cdf.shape[-1]-1)
-    cdf_grid_from = torch.gather(cdf, index=below, dim=-1)
-    cdf_grid_to = torch.gather(cdf, index=above, dim=-1)
-    z_vals_mid = (z_vals[..., 1:] + z_vals[..., :-1]) / 2 # [B, n_samples-1]
+    below = torch.clip(inds-1, 0, cdf.shape[-1]-1) # [B, n_importance_samples]
+    above = torch.clip(inds-0, 0, cdf.shape[-1]-1) # [B, n_importance_samples]
+    cdf_grid_from = torch.gather(cdf, index=below, dim=-1) # [B, n_importance_samples]
+    cdf_grid_to = torch.gather(cdf, index=above, dim=-1) # [B, n_importance_samples]
+    z_vals_mid = (z_vals[..., 1:] + z_vals[..., :-1]) / 2 # FIXME: should be [B, n_samples], but [B, n_samples-1] for now
+    
+    # FIXME: `z_vals_mid` will have duplicated point samples in first and last element for each row
+    # NOTE: as `below` and `above` can have values as indices in [0, n_samples]
+    z_vals_mid = torch.cat(
+        [
+            z_vals_mid[..., 0, None], 
+            z_vals_mid, 
+            z_vals_mid[..., -1, None]
+        ], dim=-1
+    ) 
     z_mid_from = torch.gather(z_vals_mid, index=below, dim=-1)
     z_mid_to = torch.gather(z_vals_mid, index=above, dim=-1)
 
@@ -161,7 +171,7 @@ def sample_from_inverse_cdf_torch(
             t_numerator / 
             t_denominator
         ), 
-        a_min=0.0, a_max=1.0
+        min=0.0, max=1.0
     )
     z_vals = z_mid_from + t_vals * (z_mid_to - z_mid_from)
 
