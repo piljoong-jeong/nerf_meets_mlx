@@ -331,8 +331,8 @@ def main(
             z_importance_samples = mx.array(z_importance_samples)
 
 
-            z_vals = mx.sort(mx.concatenate([z_vals, z_importance_samples], axis=-1), axis=-1) # TODO: double check
-            pts = rays_o[..., None, :] + rays_d[..., None, :] * z_vals[... :, None]
+            z_vals = mx.sort(mx.concatenate([z_vals, z_importance_samples], axis=-1), axis=-1) # [B, n_samples + n_importance_samples]
+            pts = rays_o[..., None, :] + rays_d[..., None, :] * z_vals[..., :, None]
 
             
             loss_fine = step_fine(batch_rays, pts, target_selected)
