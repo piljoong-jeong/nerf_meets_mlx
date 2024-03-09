@@ -1,8 +1,10 @@
 import numpy as onp
 import mlx.core as mx
 import mlx.nn as nn
+import torch
 
-__all__ = ["add_noise_z", "sample_from_inverse_cdf"]
+
+__all__ = ["add_noise_z", "sample_from_inverse_cdf", "sample_from_inverse_cdf_torch"]
 
 
 def add_noise_z(
@@ -86,6 +88,75 @@ def sample_from_inverse_cdf(
         t_denominator
     )
     t_vals = mx.clip(
+        (
+            t_numerator / 
+            t_denominator
+        ), 
+        a_min=0.0, a_max=1.0
+    )
+    z_vals = z_mid_from + t_vals * (z_mid_to - z_mid_from)
+
+    return z_vals
+
+  
+def sample_from_inverse_cdf_torch(
+    z_vals, # [B, n]
+    weights, # [B, n, 1]
+    n_importance_samples, 
+    eps=1e-5, 
+    is_stratified_sampling=False, 
+) -> torch.Tensor:
+    # NOTE: since `mlx` does not have `searchsorted` yet, 
+
+
+    weights = weights[..., 0] + (histogram_padding := 0.01) # [B, n]
+    weights_sum = torch.sum(weights, dim=-1, keepdim=True)
+    padding = torch.relu(eps - weights_sum)
+    weights = weights + padding / weights.shape[-1]
+    weights_sum += padding # [B, 1]
+
+    # NOTE: PDF is proportional to `weights(=transmittance)`, from geometric probability's perspective
+    pdf = weights / weights_sum
+    cdf = torch.min(
+        torch.ones_like(pdf), 
+        torch.cumsum(pdf, axis=-1)
+    ) # [B, n]
+    cdf = torch.cat(
+        [
+            torch.zeros_like(cdf[..., :1]), 
+            cdf
+        ], dim=-1
+    ) # [B, n+1?] TODO: figure out why - maybe for grid?
+
+    # NOTE: similar with `t_vals` seen in samplers, but named as `u_vals` to indicate this is importance-sampled ones
+    u_vals = None
+    if is_stratified_sampling:
+        u_vals = torch.linspace(0.0, 1.0, num=n_importance_samples)
+        u_vals = u_vals.expand(list(cdf.shape[:-1], [n_importance_samples])) # TODO: double-check
+    else: # NOTE: uniform sampling
+        u_vals = torch.rand(
+            list(cdf.shape[:-1]) + [n_importance_samples]
+        )
+
+    inds = torch.searchsorted(cdf, u_vals, side="right") 
+    # NOTE: clamp indices
+    below = torch.clip(inds-1, 0, cdf.shape[-1]-1)
+    above = torch.clip(inds-0, 0, cdf.shape[-1]-1)
+    cdf_grid_from = torch.gather(cdf, indices=below, axis=-1)
+    cdf_grid_to = torch.gather(cdf, indices=above, axis=-1)
+    z_vals_mid = (z_vals[..., 1:] + z_vals[..., :-1]) / 2 # [B, n_samples-1]
+    z_mid_from = torch.gather(z_vals_mid, indices=below, axis=-1)
+    z_mid_to = torch.gather(z_vals_mid, indices=above, axis=-1)
+
+    # NOTE: calculate importance
+    t_numerator = u_vals - cdf_grid_from
+    t_denominator = cdf_grid_to - cdf_grid_from
+    t_denominator = torch.where(
+        t_denominator < eps, 
+        torch.ones_like(t_denominator), # NOTE: as this is denominator, set 1 to do nothing
+        t_denominator
+    )
+    t_vals = torch.clip(
         (
             t_numerator / 
             t_denominator
