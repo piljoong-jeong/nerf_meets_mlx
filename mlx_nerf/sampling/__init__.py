@@ -98,7 +98,7 @@ def sample_from_inverse_cdf(
 
     return z_vals
 
-  
+@torch.no_grad()
 def sample_from_inverse_cdf_torch(
     z_vals, # [B, n]
     weights, # [B, n, 1]
@@ -142,11 +142,11 @@ def sample_from_inverse_cdf_torch(
     # NOTE: clamp indices
     below = torch.clip(inds-1, 0, cdf.shape[-1]-1)
     above = torch.clip(inds-0, 0, cdf.shape[-1]-1)
-    cdf_grid_from = torch.gather(cdf, indices=below, axis=-1)
-    cdf_grid_to = torch.gather(cdf, indices=above, axis=-1)
+    cdf_grid_from = torch.gather(cdf, index=below, dim=-1)
+    cdf_grid_to = torch.gather(cdf, index=above, dim=-1)
     z_vals_mid = (z_vals[..., 1:] + z_vals[..., :-1]) / 2 # [B, n_samples-1]
-    z_mid_from = torch.gather(z_vals_mid, indices=below, axis=-1)
-    z_mid_to = torch.gather(z_vals_mid, indices=above, axis=-1)
+    z_mid_from = torch.gather(z_vals_mid, index=below, dim=-1)
+    z_mid_to = torch.gather(z_vals_mid, index=above, dim=-1)
 
     # NOTE: calculate importance
     t_numerator = u_vals - cdf_grid_from

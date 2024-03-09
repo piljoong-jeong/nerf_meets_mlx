@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 import mlx.core as mx
 import mlx.nn as nn
 import mlx.optimizers as optim
+import torch
 import viser
 import viser.extras
 from mlx.utils import tree_flatten
@@ -120,7 +121,7 @@ def main(
         return mse_coarse
     
     optimizer_fine = optim.Adam(learning_rate=args.lrate, betas=(0.9, 0.999))
-    def mlx_mse_fine(model, batch_rays, y_gt): # FIXME: in this way computational graph won't be established
+    def mlx_mse_fine(model, batch_rays, pts, y_gt): # FIXME: in this way computational graph won't be established
         
         N_importance = args.N_importance
 
@@ -148,14 +149,6 @@ def main(
         results = render_rays(rays_linear, **render_kwargs_train)
         z_vals = results["z_vals"]
         weights = results["weights"]
-
-        z_importance_samples = sampling.sample_from_inverse_cdf(
-            z_vals, 
-            weights, 
-            N_importance, 
-        )
-        z_vals = mx.sort(mx.concatenate([z_vals, z_importance_samples], axis=-1), axis=-1) # TODO: double check
-        pts = rays_o[..., None, :] + rays_d[..., None, :] * z_vals[... :, None]
 
         run_fn = render_kwargs_train["network_fine"]
         network_query_fn = render_kwargs_train["network_query_fn"]
@@ -190,13 +183,13 @@ def main(
         return loss
     
 
-    state_fine = [render_kwargs_train["network_fine"].state, optimizer.state]
+    state_fine = [render_kwargs_train["network_fine"].state, optimizer_fine.state]
     @partial(mx.compile, inputs=state_fine, outputs=state_fine)
-    def step_fine(X, y):
+    def step_fine(batch_rays, pts, y):
         model = render_kwargs_train["network_fine"]
         loss_and_grad_fn = nn.value_and_grad(model, mlx_mse_fine)
-        loss, grads = loss_and_grad_fn(model, X, y)
-        optimizer.update(model, grads)
+        loss, grads = loss_and_grad_fn(model, batch_rays, pts, y)
+        optimizer_fine.update(model, grads)
         return loss
 
     # NOTE: ---------------- from `train(args)` --------------------    
@@ -295,9 +288,54 @@ def main(
         mx.eval(state_coarse)
 
         if render_kwargs_train["network_fine"]:
-
+            
             mx.disable_compile()
-            loss_fine = step_fine(batch_rays, target_selected)
+            
+            # TODO: `batch_rays` -> sampled rays
+            
+            N_importance = args.N_importance            
+            near = render_kwargs_train["near"]
+            far = render_kwargs_train["far"]
+
+            rays_o, rays_d = batch_rays
+            rays_shape = rays_d.shape
+            viewdirs = rays_d
+            viewdirs = viewdirs / mx.linalg.norm(viewdirs, axis=-1, keepdims=True)
+            viewdirs = mx.reshape(viewdirs, [-1, 3]).astype(mx.float32)
+
+
+            near = near * mx.ones_like(rays_d[..., :1])
+            far = far * mx.ones_like(rays_d[..., :1])
+
+            # NOTE: concat all ray-related features
+            rays = mx.concatenate(
+                [rays_o, rays_d, near, far], # FIXME: should `near` and `far` included for every ray tensor?
+                axis=-1
+            )
+            
+            rays_linear = mx.concatenate([rays, viewdirs], axis=-1)
+            results = render_rays(rays_linear, **render_kwargs_train)
+            z_vals = results["z_vals"]
+            weights = results["weights"]
+
+            z_vals_torch = torch.from_numpy(onp.array(z_vals))
+            weights_torch = torch.from_numpy(onp.array(weights))
+            
+            z_importance_samples = sampling.sample_from_inverse_cdf_torch(
+                z_vals_torch, 
+                weights_torch, 
+                N_importance, 
+            )
+
+            z_importance_samples = z_importance_samples.detach().cpu().numpy()
+            z_importance_samples = mx.array(z_importance_samples)
+
+
+            z_vals = mx.sort(mx.concatenate([z_vals, z_importance_samples], axis=-1), axis=-1) # TODO: double check
+            pts = rays_o[..., None, :] + rays_d[..., None, :] * z_vals[... :, None]
+
+            
+            loss_fine = step_fine(batch_rays, pts, target_selected)
             mx.eval(state_fine)
             mx.enable_compile()
 
