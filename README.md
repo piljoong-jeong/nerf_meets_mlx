@@ -38,16 +38,16 @@ $ python mlx_nerf
 Implementation of Neural Radiance Fields [ECCV2020]. <p>
 
 <p align="center">
-    <img src="assets/doc/volume_learning_lego_iter=20000.gif">
+    <img src="assets/doc/volume_learning_lego_iter=200000_coarse.gif">
+    <img src="assets/doc/volume_learning_lego_iter=200000_fine.gif">
 </p>
 
-Work in Progress.
-
 - [x] Coarse NeRF learning
-- [ ] Importance Sampling from coarse NeRF's transmittance
-- [ ] Detached Importance Sampling from `mlx` graph computation
-- [ ] Fine NeRF learning
+- [x] Importance Sampling from coarse NeRF's transmittance
+- [x] Detached Importance Sampling from `mlx` graph computation
+- [x] Fine NeRF learning
 - [ ] Learning rate decaying scheme
+- [ ] Code refactoring
 
 # Resources
 * [NeRF dataset](https://drive.google.com/drive/folders/128yBriW1IG_3NJ5Rp7APSTZsJqdJdfc1)
