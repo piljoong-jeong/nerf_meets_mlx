@@ -329,29 +329,30 @@ def main(
         list_losses.append(loss.item())
 
         # FIXME: learning failed w/ #iter=2k
-        # decay_rate = 0.1
-        # decay_steps = args.lrate_decay * 1000
-        # new_lrate = args.lrate * (decay_rate ** (i / decay_steps))
-        # optimizer.learning_rate = new_lrate
-        # optimizer_fine.learning_rate = new_lrate
+        decay_rate = 0.1
+        decay_steps = args.lrate_decay * 1000
+        new_lrate = args.lrate * (decay_rate ** (i / decay_steps))
+        optimizer.learning_rate = new_lrate
+        optimizer_fine.learning_rate = new_lrate
 
 
+        if i%50000 != 0: continue
+        rgb, _, _, _ = render.render(
+            H, W, K, 
+            c2w=(testpose := mx.array(poses[len(poses)//2]))[:3, :4], 
+            **render_kwargs_test
+        )
+        fig = plt.figure(figsize=(10, 4))
+        ax1 = fig.add_subplot(1, 2, 1)
+        ax1.set_title("Loss validation")
+        ax1.set_ylim(0, 1.0)
+        ax1.plot(list_iters, list_losses)
+        ax2 = fig.add_subplot(1, 2, 2)
+        to8b = lambda x: onp.array((mx.clip(x, 0.0, 1.0) * 255.0), copy=False).astype(onp.uint8)
+        ax2.imshow(to8b(rgb))
+        fig.savefig(f"results/iter={i}.png")
 
-    rgb, _, _, _ = render.render(
-        H, W, K, 
-        c2w=(testpose := mx.array(poses[len(poses)//2]))[:3, :4], 
-        **render_kwargs_test
-    )
 
-    fig = plt.figure(figsize=(10, 4))
-    ax1 = fig.add_subplot(1, 2, 1)
-    ax1.set_title("Loss validation")
-    ax1.set_ylim(0, 1.0)
-    ax1.plot(list_iters, list_losses)
-    ax2 = fig.add_subplot(1, 2, 2)
-    to8b = lambda x: onp.array((mx.clip(x, 0.0, 1.0) * 255.0), copy=False).astype(onp.uint8)
-    ax2.imshow(to8b(rgb))
-    fig.savefig(f"results/iter={i}.png")
 
     print(f"[DEBUG] saving video...")
     writer = imageio.v2.get_writer(os.path.join("results", f"iter={i}.mp4"), fps=60)

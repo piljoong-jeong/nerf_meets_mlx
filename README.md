@@ -46,7 +46,7 @@ Implementation of Neural Radiance Fields [ECCV2020]. <p>
 - [x] Importance Sampling from coarse NeRF's transmittance
 - [x] Detached Importance Sampling from `mlx` graph computation
 - [x] Fine NeRF learning
-- [ ] Learning rate decaying scheme
+- [x] Learning rate decaying scheme
 - [ ] Code refactoring
 
 # Resources
