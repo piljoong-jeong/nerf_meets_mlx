@@ -40,17 +40,17 @@ class SinusoidalEncoding(Encoding):
             self, 
             in_array: mx.array
         ):
-        """### forward
-        ###### in `mlx_nerf/encoding/sinusoidal.SinusoidalEncoding`
+        """### SinusoidalEncoding.forward
+        ###### in `mlx_nerf/encoding/sinusoidal.py`
 
         Implementation of Eq. (4) in NeRF [ECCV2020]
         """
 
-        in_array_2phi = 2.0 * mx.pi * in_array
         freq_bands = 2.0 ** mx.linspace(
             self.min_freq, self.max_freq, num=self.n_freqs
         )
-        in_array_scaled = in_array_2phi[..., None] * freq_bands # [B, in_dim, n_freqs]
+        in_array_scaled = 2.0 * mx.pi * in_array
+        in_array_scaled = in_array_scaled[..., None] * freq_bands # [B, in_dim, n_freqs]
         in_array_scaled = mx.reshape(in_array_scaled, (in_array_scaled.shape[0], -1)) # [B, in_dim * n_freqs]
 
         out_encoded = mx.sin(mx.concatenate(
@@ -58,6 +58,9 @@ class SinusoidalEncoding(Encoding):
                 in_array_scaled,                # NOTE: sin
                 in_array_scaled + mx.pi / 2.0,  # NOTE: cos; due to minimize memory access
             ], axis=-1
-        )) # [B, in_dim * n_freqs]
+        )) # [B, 2 * in_dim * n_freqs]
+
+        if self.is_include_input:
+            out_encoded = mx.concatenate([out_encoded, in_array], axis=-1)
 
         return out_encoded
