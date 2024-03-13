@@ -23,10 +23,10 @@ class SinusoidalEncoding(Encoding):
 
         self.n_freqs = n_freqs
         self.min_freq = min_freq if min_freq else 0
-        self.max_freq = max_freq
+        self.max_freq = max_freq if max_freq else float(n_freqs-1)
 
         self.is_include_input = is_include_input
-        
+        return
 
     def get_out_dim(self):
         out_dim = self.in_dim * self.n_freqs * len([mx.sin, mx.cos]) # NOTE: `in_dim=3` -> 3 * (2*10) + 3 => 63
