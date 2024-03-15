@@ -110,10 +110,6 @@ def main(
         results = render_rays(rays_linear, **render_kwargs_train)
 
         rgb = results["rgb_coarse"]
-        # nonlocal z_vals
-        # nonlocal weights
-        # z_vals = results["z_vals"]
-        # weights = results["weights"]
 
         # NOTE: fine first
         mse_coarse = mx.mean((rgb - y_gt) ** 2)
@@ -223,7 +219,7 @@ def main(
         with open(f, "w") as file:
             file.write(open(path_config, "r").read())
 
-    N_iters = 200000
+    N_iters = 200
     list_losses = []
     list_iters = []
 
@@ -264,7 +260,7 @@ def main(
 
             batch_rays = mx.stack([rays_o, rays_d], axis=0)
             target_selected = target[selected_coords[:, 0], selected_coords[:, 1]]
-        else:
+        else: # FIXME: this seems to be implemented in the case of video training
             raise NotImplementedError
 
         loss = step_coarse(batch_rays, target_selected)
@@ -272,7 +268,7 @@ def main(
 
         if render_kwargs_train["network_fine"]:
             
-            mx.disable_compile()
+            # mx.disable_compile()
             
             # TODO: `batch_rays` -> sampled rays
             
@@ -321,7 +317,7 @@ def main(
             
             loss = step_fine(batch_rays, z_vals_fine, target_selected)
             mx.eval(state_fine)
-            mx.enable_compile()
+            # mx.enable_compile()
 
         # print(f"[DEBUG] iter={i:06d} \t | loss={loss.item()=:0.6f}")
 
