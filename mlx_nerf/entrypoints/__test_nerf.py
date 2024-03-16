@@ -1,11 +1,6 @@
-import json
-import pprint
 import os
-import time
 from functools import partial
 from pathlib import Path
-from typing import List, Optional, Tuple, Union
-from PIL import Image
 
 import imageio.v2
 import numpy as onp
@@ -16,12 +11,11 @@ import mlx.optimizers as optim
 import torch
 import viser
 import viser.extras
-from mlx.utils import tree_flatten
 from tqdm import trange
 
 from this_project import get_project_root, PJ_PINK
 from mlx_nerf import config_parser
-from mlx_nerf.dataset.dataloader import load_blender_data, validate_dataset
+from mlx_nerf.dataset.dataloader import load_blender_data
 from mlx_nerf.models.NeRF import create_NeRF
 from mlx_nerf.rendering import ray, render
 from mlx_nerf.rendering.render import render_rays, raw2outputs
@@ -219,11 +213,10 @@ def main(
         with open(f, "w") as file:
             file.write(open(path_config, "r").read())
 
-    N_iters = 200
     list_losses = []
     list_iters = []
 
-    for i in trange(1, N_iters+1):
+    for i in trange(1, max_iter+1):
         # NOTE: randomize rays
         img_i = onp.random.choice(i_train)
         target = images[img_i]
