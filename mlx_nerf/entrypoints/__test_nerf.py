@@ -24,7 +24,7 @@ from mlx_nerf import sampling
 
 def main(
     path_dataset: Path = Path.home() / "Downloads" / "NeRF",
-    max_iter: int = 10000,
+    max_iter: int = 5000,
     
 ):
     
@@ -215,6 +215,8 @@ def main(
 
     list_losses = []
     list_iters = []
+    to8b = lambda x: onp.array((mx.clip(x, 0.0, 1.0) * 255.0), copy=False).astype(onp.uint8)
+
 
     for i in trange(1, max_iter+1):
         # NOTE: randomize rays
@@ -337,14 +339,14 @@ def main(
         ax1.set_ylim(0, 1.0)
         ax1.plot(list_iters, list_losses)
         ax2 = fig.add_subplot(1, 2, 2)
-        to8b = lambda x: onp.array((mx.clip(x, 0.0, 1.0) * 255.0), copy=False).astype(onp.uint8)
+        
         ax2.imshow(to8b(rgb))
         fig.savefig(f"results/iter={i}.png")
 
 
 
     print(f"[DEBUG] saving video...")
-    writer = imageio.v2.get_writer(os.path.join("results", f"iter={i}.mp4"), fps=60)
+    writer = imageio.v2.get_writer(os.path.join("results", f"iter={i}.mp4"), fps=30)
     for i in trange(render_poses.shape[0]):
         render_pose = render_poses[i]
         rgb, _, _, _ = render.render(
