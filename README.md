@@ -35,7 +35,10 @@ $ python mlx_nerf
 
 ## Volume Learning
 
+### Neural Radiance Fields
+
 Implementation of Neural Radiance Fields [ECCV2020]. <p>
+
 
 <p align="center">
     <img src="assets/doc/volume_learning_lego_iter=200000_coarse.gif">
@@ -48,6 +51,17 @@ Implementation of Neural Radiance Fields [ECCV2020]. <p>
 - [x] Fine NeRF learning
 - [x] Learning rate decaying scheme
 - [ ] Code refactoring
+
+### (WIP) Multigrid Hash Encoding 
+
+Implementation of Instant Neural Graphics Primitive [SIGGRAPH2022]. <p>
+Trained with `#iterations=5000`
+
+<p align="center">
+    <img src="assets/doc/nerf_iter=5000.gif">
+    <img src="assets/doc/ingp_iter=5000.gif">
+</p>
+
 
 # Resources
 * [NeRF dataset](https://drive.google.com/drive/folders/128yBriW1IG_3NJ5Rp7APSTZsJqdJdfc1)
