@@ -110,7 +110,7 @@ def main(
         
         return mse_coarse
     
-    optimizer_fine = optim.Adam(learning_rate=args.lrate, betas=(0.9, 0.999))
+    
     def mlx_mse_fine(model, batch_rays, z_vals_fine, y_gt): # FIXME: in this way computational graph won't be established
 
         rays_o, rays_d = batch_rays
@@ -156,13 +156,13 @@ def main(
         return loss
     
 
-    state_fine = [render_kwargs_train["network_fine"].state, optimizer_fine.state]
+    state_fine = [render_kwargs_train["network_fine"].state, optimizer.state]
     @partial(mx.compile, inputs=state_fine, outputs=state_fine)
     def step_fine(batch_rays, z_vals_fine, y):
         model = render_kwargs_train["network_fine"]
         loss_and_grad_fn = nn.value_and_grad(model, mlx_mse_fine)
         loss, grads = loss_and_grad_fn(model, batch_rays, z_vals_fine, y)
-        optimizer_fine.update(model, grads)
+        optimizer.update(model, grads)
         return loss
 
     # NOTE: ---------------- from `train(args)` --------------------    
@@ -324,7 +324,6 @@ def main(
         decay_steps = args.lrate_decay * 1000
         new_lrate = args.lrate * (decay_rate ** (i / decay_steps))
         optimizer.learning_rate = new_lrate
-        optimizer_fine.learning_rate = new_lrate
 
 
         if i%50000 != 0: continue
@@ -359,6 +358,7 @@ def main(
                 to8b(rgb), 
             ])
         )
+
     writer.close()
     
     
