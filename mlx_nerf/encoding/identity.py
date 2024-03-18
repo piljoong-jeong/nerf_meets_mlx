@@ -24,9 +24,9 @@ class IdentityEncoding(Encoding):
 
         return self.in_dim
     
-    def forward(
+    def __call__(
             self, 
             in_array: mx.array
-        ):
+    ):
 
         return in_array
