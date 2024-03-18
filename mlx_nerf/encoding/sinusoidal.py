@@ -15,15 +15,15 @@ class SinusoidalEncoding(Encoding):
         self, 
         in_dim: int, 
         n_freqs: int, 
-        min_freq: float, 
-        max_freq: float, 
+        min_freq_exp: float, 
+        max_freq_exp: float, 
         is_include_input: bool = False, 
     ) -> None:
         super().__init__(in_dim)
 
         self.n_freqs = n_freqs
-        self.min_freq = min_freq if min_freq else 0
-        self.max_freq = max_freq if max_freq else float(n_freqs-1)
+        self.min_freq_exp = min_freq_exp if min_freq_exp else 0
+        self.max_freq_exp = max_freq_exp if max_freq_exp else float(n_freqs-1)
 
         self.is_include_input = is_include_input
         return
@@ -47,7 +47,7 @@ class SinusoidalEncoding(Encoding):
         """
 
         freq_bands = 2.0 ** mx.linspace(
-            self.min_freq, self.max_freq, num=self.n_freqs
+            self.min_freq_exp, self.max_freq_exp, num=self.n_freqs
         )
         in_array_scaled = 2.0 * mx.pi * in_array
         in_array_scaled = in_array_scaled[..., None] * freq_bands # [B, in_dim, n_freqs]

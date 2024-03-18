@@ -19,6 +19,7 @@ from tqdm.auto import tqdm
 
 from this_project import get_project_root, PJ_PINK
 from mlx_nerf.models import embedding
+from mlx_nerf.encoding.sinusoidal import SinusoidalEncoding
 from mlx_nerf.models.NeRF import NeRF
 from mlx_nerf.ops.metric import MSE
 
@@ -195,7 +196,10 @@ def main(
     gui_items.img_pred = get_mx_img_pred(gui_items.img_gt.shape)
     
     N_INPUT_DIMS = 2
-    embed, out_dim = embedding.get_embedder(10, n_input_dims=N_INPUT_DIMS)
+    # embed, out_dim = embedding.get_embedder(10, n_input_dims=N_INPUT_DIMS)
+    embed = SinusoidalEncoding(N_INPUT_DIMS, 10, min_freq_exp=0.0, max_freq_exp=8.0, is_include_input=False)
+    out_dim = embed.get_out_dim()
+
 
     # NOTE: NeRF
     model = NeRF(
