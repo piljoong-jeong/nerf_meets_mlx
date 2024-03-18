@@ -15,14 +15,14 @@ class SinusoidalEncoding(Encoding):
         self, 
         in_dim: int, 
         n_freqs: int, 
-        min_freq_exp: float, 
-        max_freq_exp: float, 
+        min_freq_exp: float = None, 
+        max_freq_exp: float = None, 
         is_include_input: bool = False, 
     ) -> None:
         super().__init__(in_dim)
 
         self.n_freqs = n_freqs
-        self.min_freq_exp = min_freq_exp if min_freq_exp else 0
+        self.min_freq_exp = min_freq_exp if min_freq_exp else 0.0
         self.max_freq_exp = max_freq_exp if max_freq_exp else float(n_freqs-1)
 
         self.is_include_input = is_include_input
@@ -36,10 +36,10 @@ class SinusoidalEncoding(Encoding):
 
         return out_dim
     
-    def forward(
+    def __call__(
             self, 
             in_array: mx.array
-        ):
+    ):
         """### SinusoidalEncoding.forward
         ###### in `mlx_nerf/encoding/sinusoidal.py`
 
@@ -49,7 +49,8 @@ class SinusoidalEncoding(Encoding):
         freq_bands = 2.0 ** mx.linspace(
             self.min_freq_exp, self.max_freq_exp, num=self.n_freqs
         )
-        in_array_scaled = 2.0 * mx.pi * in_array
+        in_array_scaled = in_array
+        # in_array_scaled = 2.0 * mx.pi * in_array # NOTE: this performs worse in image training; TODO: see if the degeneration occurs in volume learning as well
         in_array_scaled = in_array_scaled[..., None] * freq_bands # [B, in_dim, n_freqs]
         in_array_scaled = mx.reshape(in_array_scaled, (in_array_scaled.shape[0], -1)) # [B, in_dim * n_freqs]
 
