@@ -1,7 +1,7 @@
 imageio==2.33.1
 imageio-ffmpeg==0.4.9
-mlx==0.6.0
-viser==0.1.23
+mlx==0.7.0
+viser==0.1.25
 
 torch
 torchvision
