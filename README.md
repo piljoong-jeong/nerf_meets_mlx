@@ -54,7 +54,7 @@ Implementation of Neural Radiance Fields [ECCV2020]. <p>
 
 ### (WIP) Multigrid Hash Encoding 
 
-Implementation of Instant Neural Graphics Primitive [SIGGRAPH2022]. <p>
+Implementation of [Instant Neural Graphics Primitives [SIGGRAPH2022]](https://arxiv.org/pdf/2201.05989.pdf). <p>
 Trained with `#iterations=5000`
 
 <p align="center">
