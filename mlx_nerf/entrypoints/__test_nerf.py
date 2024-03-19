@@ -34,22 +34,8 @@ def main(
     path_config = path_dataset / args.config
     
     configs = config_parser.load_config(None, path_config)
-    # pprint.pprint(configs)
-    args.expname = configs['expname']
-    args.basedir = configs['basedir']
-    args.datadir = configs['datadir']
-    args.dataset_type = configs['dataset_type']
-    args.no_batching = configs['no_batching']
-    args.use_viewdirs = configs['use_viewdirs']
-    args.white_bkgd = configs['white_bkgd']
-    args.lrate_decay = int(configs['lrate_decay'])
-    args.n_depth_samples = int(configs['N_samples'])
-    args.N_importance = int(configs['N_importance'])
-    args.N_rand = int(configs['N_rand'])
-    args.precrop_iters = int(configs['precrop_iters'])
-    args.precrop_frac = float(configs['precrop_frac'])
-    args.half_res = configs['half_res']
-
+    args = config_parser.update_NeRF_args(configs)
+    
     dir_dataset = configs["datadir"]
     images, poses, render_poses, hwf, i_split = load_blender_data(path_dataset / dir_dataset)
     # validate_dataset(path_dataset / dir_dataset)
@@ -66,13 +52,6 @@ def main(
             - generate embedded inputs from sampled rays
 
         """
-
-        # rgb, disp, acc, extras = render.render(
-        #     H, W, K, 
-        #     args.chunk, 
-        #     batch_rays, 
-        #     **render_kwargs_train
-        # )
 
 
         near = render_kwargs_train["near"]
