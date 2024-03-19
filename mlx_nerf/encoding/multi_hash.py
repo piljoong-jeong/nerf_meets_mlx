@@ -37,10 +37,10 @@ class MultiHashEncoding(Encoding):
         ) if self.n_levels > 1 else 1
 
         # NOTE: `N_l` in Eq. (2)
-        self.scaled_res = mx.floor(self.min_res * (self.growing_factor ** levels))
+        self.scaled_res = mx.floor(self.min_res * (self.growing_factor ** levels)) # [L]
 
         # NOTE: `T` in Table. (1)
-        self.hash_table_size = 2 ** self.log2_hashmap_size
+        self.hash_table_size = 2 ** self.log2_hashmap_size # [T]
 
         # NOTE: construct hash table for each level
         self.hash_table = [
@@ -86,8 +86,56 @@ class MultiHashEncoding(Encoding):
         
         """
 
+        # NOTE: we apply per-level scaling `self.scaled_res` to `in_array`
+        in_array_scaled = in_array[..., None, :] * self.scaled_res[..., None] # [B, L, in_dim]
+
+        # NOTE: and rounding it up and down
+        in_sc = mx.ceil(in_array_scaled).astype(mx.int32) # in_scaled_ceil
+        in_sf = mx.floor(in_array_scaled).astype(mx.int32) # in_scaled_floor
         
+        # NOTE: now calculate hashed function for each grid vertices
+        def __grid(x: mx.array, y: mx.array, z: mx.array):
+            X, Y, Z = 0, 1, 2
+            return mx.concatenate([x[..., X][None], y[..., Y][None], z[..., Z][None]], axis=-1) # [B, L, 3]
+        # NOTE: order follows https://subscription.packtpub.com/book/game-development/9781849512824/4/ch04lvl1sec09/indexing-primitives
+        # NOTE: `grid_0 == in_sc` and `grid_6 == in_sf`
+        grid_0 = __grid(in_sc, in_sc, in_sc)
+        grid_1 = __grid(in_sc, in_sf, in_sc)
+        grid_2 = __grid(in_sf, in_sf, in_sc)
+        grid_3 = __grid(in_sf, in_sc, in_sc)
+        grid_4 = __grid(in_sc, in_sc, in_sf)
+        grid_5 = __grid(in_sc, in_sf, in_sf)
+        grid_6 = __grid(in_sf, in_sf, in_sf)
+        grid_7 = __grid(in_sf, in_sc, in_sf)
 
+        # NOTE: hash multigrid points # [B, L, n_features_per_level]
+        hashed_0 = self.hash_table(self.hash(grid_0))
+        hashed_1 = self.hash_table(self.hash(grid_1))
+        hashed_2 = self.hash_table(self.hash(grid_2))
+        hashed_3 = self.hash_table(self.hash(grid_3))
+        hashed_4 = self.hash_table(self.hash(grid_4))
+        hashed_5 = self.hash_table(self.hash(grid_5))
+        hashed_6 = self.hash_table(self.hash(grid_6))
+        hashed_7 = self.hash_table(self.hash(grid_7))
 
+        # TODO: trilinear interpolation using grid points
+        offset = in_array_scaled - in_sf # NOTE: delta(in_array_scaled, in_sf)
 
-        raise NotImplementedError
+        # NOTE: inspired from https://github.com/nerfstudio-project/nerfstudio/blob/main/nerfstudio/field_components/encodings.py#L449
+        hashed_03 = hashed_0 * offset[..., 0:1] + hashed_3 * (1 - offset[..., 0:1])
+        hashed_12 = hashed_1 * offset[..., 0:1] + hashed_2 * (1 - offset[..., 0:1])
+        hashed_56 = hashed_5 * offset[..., 0:1] + hashed_6 * (1 - offset[..., 0:1])
+        hashed_47 = hashed_4 * offset[..., 0:1] + hashed_7 * (1 - offset[..., 0:1])
+
+        hashed_0312 = hashed_03 * offset[..., 1:2] + hashed_12 * (1 - offset[..., 1:2])
+        hashed_4756 = hashed_47 * offset[..., 1:2] + hashed_56 * (1 - offset[..., 1:2])
+
+        out_encoded = hashed_0312 * offset[..., 2:3] + hashed_4756 * (
+            1 - offset[..., 2:3]
+        )  # [B, L, n_features_per_level]
+
+        return mx.flatten(
+            out_encoded, 
+            start_axis=-2, 
+            end_axis=-1,
+        ) # [B, L * n_features_per_level]
