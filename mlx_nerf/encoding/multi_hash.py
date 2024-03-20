@@ -94,9 +94,9 @@ class MultiHashEncoding(Encoding):
         in_sf = mx.floor(in_array_scaled).astype(mx.int32) # in_scaled_floor
         
         # NOTE: now calculate hashed function for each grid vertices
+        X, Y, Z = slice(0, 1), slice(1, 2), slice(2, 3)
         def __grid(x: mx.array, y: mx.array, z: mx.array):
-            X, Y, Z = 0, 1, 2
-            return mx.concatenate([x[..., X][None], y[..., Y][None], z[..., Z][None]], axis=-1) # [B, L, 3]
+            return mx.concatenate([x[..., X], y[..., Y], z[..., Z]], axis=-1) # [B, L, 3]
         # NOTE: order follows https://subscription.packtpub.com/book/game-development/9781849512824/4/ch04lvl1sec09/indexing-primitives
         # NOTE: `grid_0 == in_sc` and `grid_6 == in_sf`
         grid_0 = __grid(in_sc, in_sc, in_sc)
@@ -120,22 +120,18 @@ class MultiHashEncoding(Encoding):
 
         # TODO: trilinear interpolation using grid points
         offset = in_array_scaled - in_sf # NOTE: delta(in_array_scaled, in_sf)
-
-        # NOTE: inspired from https://github.com/nerfstudio-project/nerfstudio/blob/main/nerfstudio/field_components/encodings.py#L449
-        hashed_03 = hashed_0 * offset[..., 0:1] + hashed_3 * (1 - offset[..., 0:1])
-        hashed_12 = hashed_1 * offset[..., 0:1] + hashed_2 * (1 - offset[..., 0:1])
-        hashed_56 = hashed_5 * offset[..., 0:1] + hashed_6 * (1 - offset[..., 0:1])
-        hashed_47 = hashed_4 * offset[..., 0:1] + hashed_7 * (1 - offset[..., 0:1])
-
-        hashed_0312 = hashed_03 * offset[..., 1:2] + hashed_12 * (1 - offset[..., 1:2])
-        hashed_4756 = hashed_47 * offset[..., 1:2] + hashed_56 * (1 - offset[..., 1:2])
-
-        out_encoded = hashed_0312 * offset[..., 2:3] + hashed_4756 * (
-            1 - offset[..., 2:3]
+        hashed_03 = hashed_0 * offset[..., X] + hashed_3 * (1 - offset[..., X])
+        hashed_12 = hashed_1 * offset[..., X] + hashed_2 * (1 - offset[..., X])
+        hashed_56 = hashed_5 * offset[..., X] + hashed_6 * (1 - offset[..., X])
+        hashed_47 = hashed_4 * offset[..., X] + hashed_7 * (1 - offset[..., X])
+        hashed_0312 = hashed_03 * offset[..., Y] + hashed_12 * (1 - offset[..., Y])
+        hashed_4756 = hashed_47 * offset[..., Y] + hashed_56 * (1 - offset[..., Y])
+        hashed_trilinear_interpolated = hashed_0312 * offset[..., Z] + hashed_4756 * (
+            1 - offset[..., Z]
         )  # [B, L, n_features_per_level]
 
-        return mx.flatten(
-            out_encoded, 
+        return (out_encoded := mx.flatten(
+            hashed_trilinear_interpolated, 
             start_axis=-2, 
             end_axis=-1,
-        ) # [B, L * n_features_per_level]
+        )) # [B, L * n_features_per_level]
