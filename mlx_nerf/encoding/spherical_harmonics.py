@@ -41,5 +41,40 @@ class SphericalHarmonicsEncoding(Encoding):
 
         # TODO: should I implement spherical harmonics in an independent module?
         # TODO: bc there can be a number of different usage of SH calculations
-        
+
+        x = in_dirs[..., 0]
+        y = in_dirs[..., 1]
+        z = in_dirs[..., 2]
+
+        xx = x*x
+        yy = y*y
+        zz = z*z
+        xy = x*y
+        yz = y*z
+        xz = x*z
+
+        out_encoded = mx.zeros((*in_dirs.shape[:-1], self.get_out_dim()), dtype=in_dirs.dtype)
+
+        # NOTE: by evaluating https://en.wikipedia.org/wiki/Table_of_spherical_harmonics#Real_spherical_harmonics
+        # NOTE: here, `r=1` as `in_dirs` is unit vector set
+        level = self.n_degrees
+        if level >= 0: # NOTE: for readability
+            out_encoded[..., 0] = 0.28209479177387814
+        if level >= 1:
+            out_encoded[..., 1] = 0.4886025119029199 * y
+            out_encoded[..., 2] = 0.4886025119029199 * z
+            out_encoded[..., 3] = 0.4886025119029199 * x
+        if level >= 2:
+            out_encoded[..., 4] = 1.0925484305920792 * xy
+            out_encoded[..., 5] = 1.0925484305920792 * yz
+            out_encoded[..., 6] = 0.9461746957575601 * zz - 0.31539156525251999
+            out_encoded[..., 7] = 1.0925484305920792 * xz
+            out_encoded[..., 8] = 0.5462742152960396 * (xx - yy)
+        if level >= 3:
+            # TODO
+            pass
+        if level >= 4:
+            # TODO
+            pass
+
         raise NotImplementedError
