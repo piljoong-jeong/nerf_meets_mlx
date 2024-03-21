@@ -14,9 +14,11 @@ class SphericalHarmonicsEncoding(Encoding):
     def __init__(
         self, 
         in_dim: int, 
-        n_degrees: int, 
+        n_degrees: int, # NOTE: identical to SH level; [0, 4]
     ) -> None:
         super().__init__(in_dim)
+
+        assert 0<=n_degrees<=4, f"[ERROR] {n_degrees=} must be in range [0, 4]!"
 
         self.n_degrees = n_degrees
         
@@ -24,13 +26,13 @@ class SphericalHarmonicsEncoding(Encoding):
 
     def get_out_dim(self):
         
-        out_dim = self.n_degrees ** 2
+        out_dim = (self.n_degrees+1) ** 2
 
         return out_dim
     
     def __call__(
-            self, 
-            in_array: mx.array # [B, in_dim]
+        self, 
+        in_dirs: mx.array # [B, in_dim]
     ):
         """### SphericalHarmonicsEncoding.forward
         ###### in `mlx_nerf/encoding/spherical_harmonics.py`
