@@ -37,8 +37,8 @@ class SinusoidalEncoding(Encoding):
         return out_dim
     
     def __call__(
-            self, 
-            in_array: mx.array
+        self, 
+        in_array: mx.array # [B, in_dim]
     ):
         """### SinusoidalEncoding.forward
         ###### in `mlx_nerf/encoding/sinusoidal.py`

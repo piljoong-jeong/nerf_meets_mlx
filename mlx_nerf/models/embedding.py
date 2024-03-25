@@ -42,6 +42,7 @@ class Embedder:
 
         max_freq = self.kwargs["max_freq_log2"]
         N_freqs = self.kwargs["num_freqs"]
+
         if self.kwargs["log_sampling"]:
             freq_bands = mx.linspace(
                 0.0, max_freq, num=N_freqs
