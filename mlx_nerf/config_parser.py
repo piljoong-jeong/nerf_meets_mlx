@@ -79,7 +79,7 @@ def config_parser():
 
     return parser
 
-def load_config(parser: argparse.ArgumentParser, filename_config: str = "configs/lego.txt"):
+def load_config(filename_config: str = "configs/lego.txt"):
 
     with open(filename_config, "r") as fp:
         lines = fp.readlines()

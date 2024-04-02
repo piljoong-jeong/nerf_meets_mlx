@@ -1,6 +1,7 @@
 import json
 import os
 import sys
+from enum import Enum, auto
 from PIL import Image
 from pathlib import Path
 from typing import Union
@@ -14,6 +15,11 @@ if __name__ == "__main__":
     sys.path.append(DIR_PROJECT_ROOT := os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 from mlx_nerf import config_parser
 from mlx_nerf.ops import pose
+
+class DatasetType(Enum):
+    BLENDER = auto()
+
+
 
 
 # NOTE: implement Blender data loader
