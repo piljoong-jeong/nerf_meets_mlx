@@ -33,12 +33,14 @@ def main(
     args = parser.parse_args(args=[])
     args.config = "configs/lego.txt"
     path_config = path_dataset / args.config
-    configs = config_parser.load_config(None, path_config)
+    configs = config_parser.load_config(path_config)
     args = config_parser.update_NeRF_args(args, configs)
     
     trainer = training.Trainer(path_dataset, args)
     trainer.load_dataset(DatasetType.BLENDER)
-    
+
+    # TODO: impl something like: 
+    # TODO: results = train_using(dataset, config, integrator)
     trainer.train_using(VanillaNeRFIntegrator)
 
     

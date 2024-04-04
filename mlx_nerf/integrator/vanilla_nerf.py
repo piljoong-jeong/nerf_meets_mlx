@@ -58,19 +58,20 @@ class VanillaNeRFIntegrator(Integrator):
             is_include_input=True
         )
 
-        # NOTE: define samplers
+        # NOTE: coarse
         self.sampler_uniform = uniform.sample_z # TODO: partial function to `near` & `far`-agnostic?
-        self.sampler_importance = sample_from_inverse_cdf_torch()
-
-        # NOTE: define networks
-        # TODO: replace `channel_input` correspond to `positional|directional_encoding.get_out_dim()`
         self.model_coarse = NeRF(
-
+            channel_input=positional_encoding.get_out_dim(), 
+            channel_input_views=directional_encoding.get_out_dim(), 
+            is_use_view_directions=True
         )
-        self.model_fine = NeRF()
-
-
-
-
-
         
+        # NOTE: fine
+        self.sampler_importance = sample_from_inverse_cdf_torch()
+        self.model_fine = NeRF(
+            channel_input=positional_encoding.get_out_dim(), 
+            channel_input_views=directional_encoding.get_out_dim(), 
+            is_use_view_directions=True
+        )
+        
+        # NOTE: 
