@@ -28,7 +28,7 @@ class Trainer:
         
         self.dir_dataset = self.args.datadir
 
-        self.max_iters = 2000
+        self.max_iters = 1000
 
         return
     
@@ -98,6 +98,8 @@ class Trainer:
         assert issubclass(type_integrator, Integrator), f"[ERROR] {type_integrator=} is not an {Integrator} type!"
         integrator = type_integrator((config := None))
 
+        # TODO: move plotting functions so that becomes independent with training code
+        # TODO: see how `nerfstudio` handles outputs, say in `get_outputs()`
         fig = plt.figure(figsize=(10, 4))
         list_iters = []
         list_losses_coarse = []
@@ -112,7 +114,7 @@ class Trainer:
                 self.H, self.W, self.focal, 
                 self.poses[idx_img, :3, :4])
             
-            outputs = integrator.get_outputs(X, y)
+            outputs = integrator.train(X, y)
 
             list_iters.append(i)
             list_losses_coarse.append(outputs['loss_coarse'].item())

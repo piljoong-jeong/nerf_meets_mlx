@@ -91,23 +91,8 @@ class VanillaNeRFIntegrator(Integrator):
         self.n_importance_samples = 128
         self.perturb = 0.0
 
-    # NOTE: all computations to backpropagate must be fused in `mlx` kernel
-    def get_outputs(
-        self, 
-        rays,   # [2, B, 3]
-        target, # [B, 3]
-    ):
-        
-
-        rays_o, rays_d = rays
-        rays_shape = rays_d.shape
-        n_rays = rays_shape[0]
-        viewdirs = rays_d
-        viewdirs = viewdirs / mx.linalg.norm(viewdirs, axis=-1, keepdims=True)
-        viewdirs = mx.reshape(viewdirs, [-1, 3]).astype(mx.float32)
-        near = self.near * mx.ones_like(rays_d[..., :1])
-        far = self.far * mx.ones_like(rays_d[..., :1])
-
+    # TODO: consider refactor ray informations into a representative class e.g., `RayBundle` or `RaySample` as in `nerfstudio`
+    def __train_coarse(self, n_rays, rays_o, rays_d, viewdirs, near, far, target):
 
         # NOTE: uniform depth sampling
         z_vals = uniform.sample_z(near, far, self.n_depth_samples)
@@ -164,7 +149,10 @@ class VanillaNeRFIntegrator(Integrator):
         loss_coarse, weights = step_coarse(rays_o, rays_d, z_vals, viewdirs, target)
         mx.eval(state_coarse)
 
-        # NOTE: train fine network
+        return loss_coarse, z_vals, weights
+
+    def __train_fine(self, n_rays, rays_o, rays_d, viewdirs, z_vals, weights, target):
+
 
         # NOTE: `torch.searchsorted` not supports `mps` backend
         z_vals_torch = torch.from_numpy(onp.array(z_vals))# .to("mps")
@@ -215,9 +203,6 @@ class VanillaNeRFIntegrator(Integrator):
             mse_fine = mx.mean((rgb_fine - y_gt) ** 2)
             
             return mse_fine
-
-
-
         
         state_fine = [self.model_fine.state, self.optimizer.state]
         @partial(mx.compile, inputs=state_fine, outputs=state_fine)
@@ -230,7 +215,45 @@ class VanillaNeRFIntegrator(Integrator):
             return loss
         loss_fine = step_fine(rays_o, rays_d, z_vals_fine, viewdirs, target)
         mx.eval(state_fine)
+
+        return loss_fine
         
+
+    # NOTE: all computations to backpropagate must be fused in `mlx` kernel
+    def train(
+        self, 
+        rays,   # [2, B, 3]
+        target, # [B, 3]
+    ):
+        rays_o, rays_d = rays
+        rays_shape = rays_d.shape
+        n_rays = rays_shape[0]
+        viewdirs = rays_d
+        viewdirs = viewdirs / mx.linalg.norm(viewdirs, axis=-1, keepdims=True)
+        viewdirs = mx.reshape(viewdirs, [-1, 3]).astype(mx.float32)
+        near = self.near * mx.ones_like(rays_d[..., :1])
+        far = self.far * mx.ones_like(rays_d[..., :1])
+
+
+        loss_coarse, z_vals, weights = self.__train_coarse(
+            n_rays, 
+            rays_o, 
+            rays_d, 
+            viewdirs, 
+            near, 
+            far, 
+            target
+        )
+
+        loss_fine = self.__train_fine(
+            n_rays, 
+            rays_o, 
+            rays_d, 
+            viewdirs, 
+            z_vals, 
+            weights, 
+            target
+        )
 
         return {
             'loss_coarse': loss_coarse, 

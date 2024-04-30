@@ -39,6 +39,8 @@ def sample_from_inverse_cdf(
     is_stratified_sampling=False, 
 ):
     
+    raise NotImplementedError, f"[ERROR] using `sample_from_inverse_cdf` introduces cast to `onp.array` back and forth to use `onp.searchsorted` method, which breaks computational graph construction in `mx.compile`! Hence we throw error when you attempted to use this method, but we encourage to use the alternative: `sample_from_inverse_cdf_torch`."
+
     weights = weights[..., 0] + (histogram_padding := 0.01) # [B, n]
     weights_sum = mx.sum(weights, axis=-1, keepdims=True)
     padding = nn.relu(eps - weights_sum)
