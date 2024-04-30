@@ -16,6 +16,7 @@ import mlx.optimizers as optim
 
 
 from this_project import get_project_root
+from mlx_nerf import sampling
 from mlx_nerf.encoding.sinusoidal import SinusoidalEncoding
 from mlx_nerf.integrator import Integrator
 from mlx_nerf.models.NeRF import NeRF
@@ -43,14 +44,14 @@ class VanillaNeRFIntegrator(Integrator):
         """
 
         # NOTE: define encoders, used regardless of coarse|fine network
-        positional_encoding = SinusoidalEncoding(
+        self.positional_encoding = SinusoidalEncoding(
             in_dim=3, 
             n_freqs=10, 
             min_freq_exp=0.0, 
             max_freq_exp=9.0, 
             is_include_input=True
         )
-        directional_encoding = SinusoidalEncoding(
+        self.directional_encoding = SinusoidalEncoding(
             in_dim=3, 
             n_freqs=4, 
             min_freq_exp=0.0, 
@@ -61,17 +62,79 @@ class VanillaNeRFIntegrator(Integrator):
         # NOTE: coarse
         self.sampler_uniform = uniform.sample_z # TODO: partial function to `near` & `far`-agnostic?
         self.model_coarse = NeRF(
-            channel_input=positional_encoding.get_out_dim(), 
-            channel_input_views=directional_encoding.get_out_dim(), 
+            channel_input=self.positional_encoding.get_out_dim(), 
+            channel_input_views=self.directional_encoding.get_out_dim(), 
             is_use_view_directions=True
         )
+        mx.eval(self.model_coarse.parameters())
         
         # NOTE: fine
-        self.sampler_importance = sample_from_inverse_cdf_torch()
+        self.sampler_importance = sample_from_inverse_cdf_torch
         self.model_fine = NeRF(
-            channel_input=positional_encoding.get_out_dim(), 
-            channel_input_views=directional_encoding.get_out_dim(), 
+            channel_input=self.positional_encoding.get_out_dim(), 
+            channel_input_views=self.directional_encoding.get_out_dim(), 
             is_use_view_directions=True
         )
+        mx.eval(self.model_fine.parameters())
         
-        # NOTE: 
+        # NOTE: renderer
+
+
+        # NOTE: optimizer
+        self.optimizer = optim.Adam(learning_rate=(learning_rate := 5e-4), betas=(0.9, 0.999))
+
+        # FIXME: refactor
+        self.near = 2.0
+        self.far = 6.0
+        self.n_depth_samples = 64
+        self.n_importance_samples = 128
+        self.perturb = 0.0
+
+    # NOTE: all computations to backpropate must be fused in `mlx` kernel
+    def get_outputs(
+        self, 
+        rays,   # [2, B, 3]
+        target, # [B, 3]
+    ):
+        
+        rays_o, rays_d = rays
+        rays_shape = rays_d.shape
+        viewdirs = rays_d
+        viewdirs = viewdirs / mx.linalg.norm(viewdirs, axis=-1, keepdims=True)
+        viewdirs = mx.reshape(viewdirs, [-1, 3]).astype(mx.float32)
+
+        near = self.near * mx.ones_like(rays_d[..., :1])
+        far = self.far * mx.ones_like(rays_d[..., :1])
+        
+        """
+        rays = mx.concatenate(
+            [rays_o, rays_d, near, far], # TODO: should `near` and `far` included for every ray tensor?
+            axis=-1
+        )
+        rays_linear = mx.concatenate([rays, viewdirs], axis=-1)
+        """
+
+        # NOTE: uniform depth sampling
+        z_vals = uniform.sample_z(near, far, self.n_depth_samples)
+        z_vals = sampling.add_noise_z(z_vals, self.perturb)
+
+        # NOTE: encode positional samples
+        pos = rays_o[..., None, :] + (z_vals[..., :, None] * rays_d[..., None, :]) # NOTE: [B, n_depth_samples, 3]
+        embedded_pos = self.positional_encoding((pos_flat := mx.reshape(pos, [-1, pos.shape[-1]]))) # NOTE: `pos_flat`: [B*n_depth_samples, 3]
+
+        # NOTE: encode directional samples
+        dir = mx.repeat(viewdirs[:, None, :], repeats=pos.shape[1], axis=1)
+        embedded_dir = self.directional_encoding((dir_flat := mx.reshape(dir, [-1, dir.shape[-1]])))
+
+        embedded = mx.concatenate([embedded_pos, embedded_dir], axis=-1)
+
+        print(f"{embedded_pos.shape=}")
+        print(f"{embedded_dir.shape=}")
+        print(f"{embedded.shape=}")
+
+
+        field_outputs_coarse = self.model_coarse.forward(embedded)
+        print(f"{field_outputs_coarse.shape=}")
+
+        return NotImplementedError
+    

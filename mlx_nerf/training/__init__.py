@@ -94,6 +94,7 @@ class Trainer:
     ):
         
         assert issubclass(type_integrator, Integrator), f"[ERROR] {type_integrator=} is not an {Integrator} type!"
+        integrator = type_integrator((config := None))
 
         for i in trange(1, self.max_iters+1):
             idx_img = onp.random.choice(self.i_train)
@@ -105,6 +106,8 @@ class Trainer:
             
             print(f"{X.shape=}")
             print(f"{y.shape=}")
+
+            outputs = integrator.get_outputs(X, y)
 
             break
         
