@@ -84,7 +84,7 @@ class Trainer:
         rays_d = rays_d[selected_coords[:, 0], selected_coords[:, 1]]
 
         batch_rays = mx.stack([rays_o, rays_d], axis=0)
-        target_selected = img_target[selected_coords[:, 0], selected_coords[:, 1]]
+        target_selected = mx.array(img_target[selected_coords[:, 0], selected_coords[:, 1]])[..., :3] # NOTE: remove alpha channel # FIXME: slice earlier
 
         return batch_rays, target_selected
 

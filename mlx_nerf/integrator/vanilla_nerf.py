@@ -90,7 +90,7 @@ class VanillaNeRFIntegrator(Integrator):
         self.n_importance_samples = 128
         self.perturb = 0.0
 
-    # NOTE: all computations to backpropate must be fused in `mlx` kernel
+    # NOTE: all computations to backpropagate must be fused in `mlx` kernel
     def get_outputs(
         self, 
         rays,   # [2, B, 3]
@@ -99,6 +99,7 @@ class VanillaNeRFIntegrator(Integrator):
         
         rays_o, rays_d = rays
         rays_shape = rays_d.shape
+        n_rays = rays_shape[0]
         viewdirs = rays_d
         viewdirs = viewdirs / mx.linalg.norm(viewdirs, axis=-1, keepdims=True)
         viewdirs = mx.reshape(viewdirs, [-1, 3]).astype(mx.float32)
@@ -120,21 +121,33 @@ class VanillaNeRFIntegrator(Integrator):
 
         # NOTE: encode positional samples
         pos = rays_o[..., None, :] + (z_vals[..., :, None] * rays_d[..., None, :]) # NOTE: [B, n_depth_samples, 3]
-        embedded_pos = self.positional_encoding((pos_flat := mx.reshape(pos, [-1, pos.shape[-1]]))) # NOTE: `pos_flat`: [B*n_depth_samples, 3]
+        embedded_pos = self.positional_encoding(
+            # NOTE: `pos_flat`: [B*n_depth_samples, 3]
+            (pos_flat := mx.reshape(pos, [-1, pos.shape[-1]]))
+        ) # [B*n_depth_samples, self.positional_encoding.get_out_dim()]
 
         # NOTE: encode directional samples
         dir = mx.repeat(viewdirs[:, None, :], repeats=pos.shape[1], axis=1)
-        embedded_dir = self.directional_encoding((dir_flat := mx.reshape(dir, [-1, dir.shape[-1]])))
+        embedded_dir = self.directional_encoding(
+            # NOTE: `dir_flat`: [B*n_depth_samples, 3]
+            (dir_flat := mx.reshape(dir, [-1, dir.shape[-1]]))
+        ) # [B*n_depth_samples, self.directional_encoding.get_out_dim()]
 
-        embedded = mx.concatenate([embedded_pos, embedded_dir], axis=-1)
+        embedded = mx.concatenate([embedded_pos, embedded_dir], axis=-1) # [B*n_depth_samples, `embedded_pos.shape[-1]+embedded_dir.shape[-1]`]
 
-        print(f"{embedded_pos.shape=}")
-        print(f"{embedded_dir.shape=}")
-        print(f"{embedded.shape=}")
+        model_outputs_coarse = self.model_coarse.forward(embedded) # [B*n_depth_samples, RGBA]
+        # NOTE: reshape [B*n_depth_samples, RGBA] -> [B, n_depth_samples, RGBA]
+        outputs = mx.reshape(
+            model_outputs_coarse, 
+            [n_rays, self.n_depth_samples, model_outputs_coarse.shape[-1]] # TODO: double-check
+        )
 
+        rgb_coarse, disp_coarse, acc_coarse, weights, depth_map = raw2outputs(
+            outputs, z_vals, rays_d, (raw_noise_std:=0.0), (white_bkgd:=False), (pytest:=False)
+        )
 
-        field_outputs_coarse = self.model_coarse.forward(embedded)
-        print(f"{field_outputs_coarse.shape=}")
+        mse_coarse = mx.mean((rgb_coarse - target) ** 2)
+        print(f"{mse_coarse=}")
 
         return NotImplementedError
     
