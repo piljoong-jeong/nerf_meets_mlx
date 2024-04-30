@@ -100,7 +100,8 @@ class Trainer:
 
         fig = plt.figure(figsize=(10, 4))
         list_iters = []
-        list_losses = []
+        list_losses_coarse = []
+        list_losses_fine = []
         list_rgbs = []; to8b = lambda x: onp.array((mx.clip(x, 0.0, 1.0) * 255.0), copy=False).astype(onp.uint8)
 
         for i in trange(1, self.max_iters+1):
@@ -114,18 +115,21 @@ class Trainer:
             outputs = integrator.get_outputs(X, y)
 
             list_iters.append(i)
-            list_losses.append(outputs['loss'].item())
-            list_rgbs.append(to8b(outputs["rgb_coarse"]))
+            list_losses_coarse.append(outputs['loss_coarse'].item())
+            list_losses_fine.append(outputs['loss_fine'].item())
+            
 
         
         ax1 = fig.add_subplot(1, 2, 1)
-        ax1.set_title("Loss validation")
+        ax1.set_title("Coarse Loss validation")
         # ax1.set_ylim(0, 1.0)
-        ax1.plot(list_iters, list_losses)
+        ax1.plot(list_iters, list_losses_coarse)
 
         ax2 = fig.add_subplot(1, 2, 2)
-        ax2.set_title("Coarse network rendering")
-        ax2.imshow(list_rgbs[-1])
+        ax2.set_title("Fine Loss validation")
+        # ax1.set_ylim(0, 1.0)
+        ax2.plot(list_iters, list_losses_fine)
+
 
         fig.savefig(f"results/integrator/iter={i}.png")
         

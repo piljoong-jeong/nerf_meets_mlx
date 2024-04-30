@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 import mlx.core as mx
 import mlx.nn as nn
 import mlx.optimizers as optim
+import torch
 
 
 from this_project import get_project_root
@@ -147,8 +148,7 @@ class VanillaNeRFIntegrator(Integrator):
 
             mse_coarse = mx.mean((rgb_coarse - y_gt) ** 2)
             
-
-            return mse_coarse, rgb_coarse, weights
+            return mse_coarse, weights
 
 
         # NOTE: train coarse network
@@ -157,31 +157,84 @@ class VanillaNeRFIntegrator(Integrator):
         def step_coarse(rays_o, rays_d, z_vals, viewdirs, y):
 
             loss_and_grad_fn = nn.value_and_grad(self.model_coarse, mlx_mse_coarse)
-            (loss, rgb_coarse, weights), grads = loss_and_grad_fn(self.model_coarse, rays_o, rays_d, z_vals, viewdirs, y)
+            (loss_coarse, weights), grads = loss_and_grad_fn(self.model_coarse, rays_o, rays_d, z_vals, viewdirs, y)
             self.optimizer.update(self.model_coarse, grads)
 
-            return loss, rgb_coarse, weights
-        loss, rgb_coarse, weights = step_coarse(rays_o, rays_d, z_vals, viewdirs, target)
+            return loss_coarse, weights
+        loss_coarse, weights = step_coarse(rays_o, rays_d, z_vals, viewdirs, target)
         mx.eval(state_coarse)
 
         # NOTE: train fine network
-        """
+
+        # NOTE: `torch.searchsorted` not supports `mps` backend
+        z_vals_torch = torch.from_numpy(onp.array(z_vals))# .to("mps")
+        weights_torch = torch.from_numpy(onp.array(weights))# .to("mps")
+        
+        z_importance_samples = sampling.sample_from_inverse_cdf_torch(
+            z_vals_torch, 
+            weights_torch, 
+            self.n_importance_samples, 
+        )
+        z_importance_samples = z_importance_samples.detach().cpu().numpy()
+        z_importance_samples = mx.array(z_importance_samples)
+
+
+        z_vals_fine = mx.sort(mx.concatenate([z_vals, z_importance_samples], axis=-1), axis=-1) # [B, n_samples + n_importance_samples]
+
+        def mlx_mse_fine(model, rays_o, rays_d, z_vals_fine, viewdirs, y_gt):
+
+            
+            pos = rays_o[..., None, :] + (z_vals_fine[..., :, None] * rays_d[..., None, :]) # NOTE: [B, n_depth_samples, 3]
+            dir = mx.repeat(viewdirs[:, None, :], repeats=pos.shape[1], axis=1)
+
+            # NOTE: encode positional samples
+            embedded_pos = self.positional_encoding(
+                # NOTE: `pos_flat`: [B*n_depth_samples, 3]
+                (pos_flat := mx.reshape(pos, [-1, pos.shape[-1]]))
+            ) # [B*n_depth_samples, self.positional_encoding.get_out_dim()]
+
+            # NOTE: encode directional samples
+            embedded_dir = self.directional_encoding(
+                # NOTE: `dir_flat`: [B*n_depth_samples, 3]
+                (dir_flat := mx.reshape(dir, [-1, dir.shape[-1]]))
+            ) # [B*n_depth_samples, self.directional_encoding.get_out_dim()]
+
+            embedded = mx.concatenate([embedded_pos, embedded_dir], axis=-1) # [B*n_depth_samples, `embedded_pos.shape[-1]+embedded_dir.shape[-1]`]
+
+            model_outputs_fine = model.forward(embedded) # [B*n_depth_samples, RGBA]
+            # NOTE: reshape [B*n_depth_samples, RGBA] -> [B, n_depth_samples, RGBA]
+            outputs = mx.reshape(
+                model_outputs_fine, 
+                [n_rays, self.n_depth_samples+self.n_importance_samples, model_outputs_fine.shape[-1]] # TODO: double-check
+            )
+
+            rgb_fine, disp_fine, acc_fine, weights, depth_map = raw2outputs(
+                outputs, z_vals_fine, rays_d, (raw_noise_std:=0.0), (white_bkgd:=False), (pytest:=False)
+            )
+
+            mse_fine = mx.mean((rgb_fine - y_gt) ** 2)
+            
+            return mse_fine
+
+
+
+        
         state_fine = [self.model_fine.state, self.optimizer.state]
         @partial(mx.compile, inputs=state_fine, outputs=state_fine)
-        def step_fine(rays_o, rays_d, z_vals, viewdirs, y):
+        def step_fine(rays_o, rays_d, z_vals_fine, viewdirs, y):
 
             loss_and_grad_fn = nn.value_and_grad(self.model_fine, mlx_mse_fine)
-            (loss, rgb_fine), grads = loss_and_grad_fn(self.model_coarse, rays_o, rays_d, z_vals, viewdirs, y)
-            self.optimizer.update(self.model_coarse, grads)
+            loss, grads = loss_and_grad_fn(self.model_fine, rays_o, rays_d, z_vals_fine, viewdirs, y)
+            self.optimizer.update(self.model_fine, grads)
 
-            return loss, weights
-        loss, weights = step_fine(rays_o, rays_d, z_vals, viewdirs, target)
+            return loss
+        loss_fine = step_fine(rays_o, rays_d, z_vals_fine, viewdirs, target)
         mx.eval(state_fine)
-        """
+        
 
         return {
-            'loss': loss, 
-            "rgb_coarse": rgb_coarse, 
+            'loss_coarse': loss_coarse, 
+            'loss_fine': loss_fine, 
         }
 
     
