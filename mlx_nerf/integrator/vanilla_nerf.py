@@ -148,23 +148,40 @@ class VanillaNeRFIntegrator(Integrator):
             mse_coarse = mx.mean((rgb_coarse - y_gt) ** 2)
             
 
-            return mse_coarse, weights
+            return mse_coarse, rgb_coarse, weights
 
 
-        # NOTE: 
+        # NOTE: train coarse network
         state_coarse = [self.model_coarse.state, self.optimizer.state]
         @partial(mx.compile, inputs=state_coarse, outputs=state_coarse)
         def step_coarse(rays_o, rays_d, z_vals, viewdirs, y):
 
             loss_and_grad_fn = nn.value_and_grad(self.model_coarse, mlx_mse_coarse)
-            (loss, weights), grads = loss_and_grad_fn(self.model_coarse, rays_o, rays_d, z_vals, viewdirs, y)
+            (loss, rgb_coarse, weights), grads = loss_and_grad_fn(self.model_coarse, rays_o, rays_d, z_vals, viewdirs, y)
+            self.optimizer.update(self.model_coarse, grads)
+
+            return loss, rgb_coarse, weights
+        loss, rgb_coarse, weights = step_coarse(rays_o, rays_d, z_vals, viewdirs, target)
+        mx.eval(state_coarse)
+
+        # NOTE: train fine network
+        """
+        state_fine = [self.model_fine.state, self.optimizer.state]
+        @partial(mx.compile, inputs=state_fine, outputs=state_fine)
+        def step_fine(rays_o, rays_d, z_vals, viewdirs, y):
+
+            loss_and_grad_fn = nn.value_and_grad(self.model_fine, mlx_mse_fine)
+            (loss, rgb_fine), grads = loss_and_grad_fn(self.model_coarse, rays_o, rays_d, z_vals, viewdirs, y)
             self.optimizer.update(self.model_coarse, grads)
 
             return loss, weights
+        loss, weights = step_fine(rays_o, rays_d, z_vals, viewdirs, target)
+        mx.eval(state_fine)
+        """
 
-        loss, weights = step_coarse(rays_o, rays_d, z_vals, viewdirs, target)
-        mx.eval(state_coarse)
-
-        return {'loss': loss}
+        return {
+            'loss': loss, 
+            "rgb_coarse": rgb_coarse, 
+        }
 
     

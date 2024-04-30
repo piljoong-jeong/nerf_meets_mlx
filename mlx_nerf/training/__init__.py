@@ -101,6 +101,7 @@ class Trainer:
         fig = plt.figure(figsize=(10, 4))
         list_iters = []
         list_losses = []
+        list_rgbs = []; to8b = lambda x: onp.array((mx.clip(x, 0.0, 1.0) * 255.0), copy=False).astype(onp.uint8)
 
         for i in trange(1, self.max_iters+1):
             idx_img = onp.random.choice(self.i_train)
@@ -114,11 +115,17 @@ class Trainer:
 
             list_iters.append(i)
             list_losses.append(outputs['loss'].item())
+            list_rgbs.append(to8b(outputs["rgb_coarse"]))
+
         
-        ax1 = fig.add_subplot(1, 1, 1)
+        ax1 = fig.add_subplot(1, 2, 1)
         ax1.set_title("Loss validation")
         # ax1.set_ylim(0, 1.0)
         ax1.plot(list_iters, list_losses)
+
+        ax2 = fig.add_subplot(1, 2, 2)
+        ax2.set_title("Coarse network rendering")
+        ax2.imshow(list_rgbs[-1])
 
         fig.savefig(f"results/integrator/iter={i}.png")
         
