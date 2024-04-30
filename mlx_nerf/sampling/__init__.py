@@ -4,7 +4,7 @@ import mlx.nn as nn
 import torch
 
 
-__all__ = ["add_noise_z", "sample_from_inverse_cdf", "sample_from_inverse_cdf_torch"]
+__all__ = ["add_noise_z", "sample_from_inverse_cdf", "sample_from_inverse_cdf_using_torch"]
 
 
 def add_noise_z(
@@ -179,7 +179,7 @@ def __sample_from_inverse_cdf_torch_impl(
 
     return z_vals
 
-def sample_from_inverse_cdf_torch(
+def sample_from_inverse_cdf_using_torch(
     z_vals, # [B, n]
     weights, # [B, n, 1]
     n_importance_samples, 

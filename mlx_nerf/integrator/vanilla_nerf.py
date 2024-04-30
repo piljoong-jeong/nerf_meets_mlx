@@ -23,7 +23,7 @@ from mlx_nerf.integrator import Integrator
 from mlx_nerf.models.NeRF import NeRF
 from mlx_nerf.rendering import ray, render
 from mlx_nerf.rendering.render import render_rays, raw2outputs
-from mlx_nerf.sampling import sample_from_inverse_cdf_torch, uniform
+from mlx_nerf.sampling import sample_from_inverse_cdf_using_torch, uniform
 
 class VanillaNeRFIntegrator(Integrator):
     def __init__(self, config) -> None:
@@ -70,7 +70,7 @@ class VanillaNeRFIntegrator(Integrator):
         mx.eval(self.model_coarse.parameters())
         
         # NOTE: fine
-        self.sampler_importance = sample_from_inverse_cdf_torch
+        self.sampler_importance = sample_from_inverse_cdf_using_torch
         self.model_fine = NeRF(
             channel_input=self.positional_encoding.get_out_dim(), 
             channel_input_views=self.directional_encoding.get_out_dim(), 
@@ -94,15 +94,11 @@ class VanillaNeRFIntegrator(Integrator):
     # TODO: consider refactor ray informations into a representative class e.g., `RayBundle` or `RaySample` as in `nerfstudio`
     def __train_coarse(self, n_rays, rays_o, rays_d, viewdirs, near, far, target):
 
-        # NOTE: uniform depth sampling
-        z_vals = uniform.sample_z(near, far, self.n_depth_samples)
-        z_vals = sampling.add_noise_z(z_vals, self.perturb)
-
-
+        z_vals = self.sampler_uniform(near, far, self.n_depth_samples)
 
         def mlx_mse_coarse(model, rays_o, rays_d, z_vals, viewdirs, y_gt):
 
-            
+            # FIXME: passing `pos` and `dir` causes mx eval error
             pos = rays_o[..., None, :] + (z_vals[..., :, None] * rays_d[..., None, :]) # NOTE: [B, n_depth_samples, 3]
             dir = mx.repeat(viewdirs[:, None, :], repeats=pos.shape[1], axis=1)
 
@@ -154,11 +150,11 @@ class VanillaNeRFIntegrator(Integrator):
     def __train_fine(self, n_rays, rays_o, rays_d, viewdirs, z_vals, weights, target):
 
 
-        z_vals_fine = sample_from_inverse_cdf_torch(z_vals, weights, self.n_importance_samples)
+        z_vals_fine = self.sampler_importance(z_vals, weights, self.n_importance_samples)
 
         def mlx_mse_fine(model, rays_o, rays_d, z_vals_fine, viewdirs, y_gt):
 
-            
+            # FIXME: passing `pos` and `dir` causes mx eval error
             pos = rays_o[..., None, :] + (z_vals_fine[..., :, None] * rays_d[..., None, :]) # NOTE: [B, n_depth_samples, 3]
             dir = mx.repeat(viewdirs[:, None, :], repeats=pos.shape[1], axis=1)
 
@@ -246,5 +242,3 @@ class VanillaNeRFIntegrator(Integrator):
             'loss_coarse': loss_coarse, 
             'loss_fine': loss_fine, 
         }
-
-    

@@ -28,7 +28,7 @@ class Trainer:
         
         self.dir_dataset = self.args.datadir
 
-        self.max_iters = 1000
+        self.max_iters = 500
 
         return
     
