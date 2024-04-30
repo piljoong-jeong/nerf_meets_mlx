@@ -34,7 +34,7 @@ def main(
     path_config = path_dataset / args.config
     
     configs = config_parser.load_config(path_config)
-    args = config_parser.update_NeRF_args(configs)
+    args = config_parser.update_NeRF_args(args, configs)
     
     dir_dataset = configs["datadir"]
     images, poses, render_poses, hwf, i_split = load_blender_data(path_dataset / dir_dataset)

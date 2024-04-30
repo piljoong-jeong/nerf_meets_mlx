@@ -3,6 +3,6 @@
 # NOTE: hence, do import manually
 
 from .__viser_image_learning import main as viser_image_learning
-from .__test_nerf import main as test_nerf
+from .__test_nerf_bak import main as test_nerf
 
 # TODO: set common theme here
