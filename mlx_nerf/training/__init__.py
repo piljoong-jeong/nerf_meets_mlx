@@ -6,8 +6,10 @@ from argparse import ArgumentParser
 from enum import Enum, auto
 
 import numpy as onp
+import matplotlib.pyplot as plt
 import mlx.core as mx
 from tqdm import trange
+
 
 from mlx_nerf.dataset.dataloader import DatasetType, load_blender_data
 from mlx_nerf.integrator import Integrator
@@ -96,6 +98,10 @@ class Trainer:
         assert issubclass(type_integrator, Integrator), f"[ERROR] {type_integrator=} is not an {Integrator} type!"
         integrator = type_integrator((config := None))
 
+        fig = plt.figure(figsize=(10, 4))
+        list_iters = []
+        list_losses = []
+
         for i in trange(1, self.max_iters+1):
             idx_img = onp.random.choice(self.i_train)
             X, y = self.select_pixels(
@@ -104,11 +110,16 @@ class Trainer:
                 self.H, self.W, self.focal, 
                 self.poses[idx_img, :3, :4])
             
-            print(f"{X.shape=}")
-            print(f"{y.shape=}")
-
             outputs = integrator.get_outputs(X, y)
 
-            break
+            list_iters.append(i)
+            list_losses.append(outputs['loss'].item())
+        
+        ax1 = fig.add_subplot(1, 1, 1)
+        ax1.set_title("Loss validation")
+        # ax1.set_ylim(0, 1.0)
+        ax1.plot(list_iters, list_losses)
+
+        fig.savefig(f"results/integrator/iter={i}.png")
         
         return

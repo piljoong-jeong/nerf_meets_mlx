@@ -97,57 +97,74 @@ class VanillaNeRFIntegrator(Integrator):
         target, # [B, 3]
     ):
         
+
         rays_o, rays_d = rays
         rays_shape = rays_d.shape
         n_rays = rays_shape[0]
         viewdirs = rays_d
         viewdirs = viewdirs / mx.linalg.norm(viewdirs, axis=-1, keepdims=True)
         viewdirs = mx.reshape(viewdirs, [-1, 3]).astype(mx.float32)
-
         near = self.near * mx.ones_like(rays_d[..., :1])
         far = self.far * mx.ones_like(rays_d[..., :1])
-        
-        """
-        rays = mx.concatenate(
-            [rays_o, rays_d, near, far], # TODO: should `near` and `far` included for every ray tensor?
-            axis=-1
-        )
-        rays_linear = mx.concatenate([rays, viewdirs], axis=-1)
-        """
+
 
         # NOTE: uniform depth sampling
         z_vals = uniform.sample_z(near, far, self.n_depth_samples)
         z_vals = sampling.add_noise_z(z_vals, self.perturb)
 
-        # NOTE: encode positional samples
-        pos = rays_o[..., None, :] + (z_vals[..., :, None] * rays_d[..., None, :]) # NOTE: [B, n_depth_samples, 3]
-        embedded_pos = self.positional_encoding(
-            # NOTE: `pos_flat`: [B*n_depth_samples, 3]
-            (pos_flat := mx.reshape(pos, [-1, pos.shape[-1]]))
-        ) # [B*n_depth_samples, self.positional_encoding.get_out_dim()]
 
-        # NOTE: encode directional samples
-        dir = mx.repeat(viewdirs[:, None, :], repeats=pos.shape[1], axis=1)
-        embedded_dir = self.directional_encoding(
-            # NOTE: `dir_flat`: [B*n_depth_samples, 3]
-            (dir_flat := mx.reshape(dir, [-1, dir.shape[-1]]))
-        ) # [B*n_depth_samples, self.directional_encoding.get_out_dim()]
 
-        embedded = mx.concatenate([embedded_pos, embedded_dir], axis=-1) # [B*n_depth_samples, `embedded_pos.shape[-1]+embedded_dir.shape[-1]`]
+        def mlx_mse_coarse(model, rays_o, rays_d, z_vals, viewdirs, y_gt):
 
-        model_outputs_coarse = self.model_coarse.forward(embedded) # [B*n_depth_samples, RGBA]
-        # NOTE: reshape [B*n_depth_samples, RGBA] -> [B, n_depth_samples, RGBA]
-        outputs = mx.reshape(
-            model_outputs_coarse, 
-            [n_rays, self.n_depth_samples, model_outputs_coarse.shape[-1]] # TODO: double-check
-        )
+            
+            pos = rays_o[..., None, :] + (z_vals[..., :, None] * rays_d[..., None, :]) # NOTE: [B, n_depth_samples, 3]
+            dir = mx.repeat(viewdirs[:, None, :], repeats=pos.shape[1], axis=1)
 
-        rgb_coarse, disp_coarse, acc_coarse, weights, depth_map = raw2outputs(
-            outputs, z_vals, rays_d, (raw_noise_std:=0.0), (white_bkgd:=False), (pytest:=False)
-        )
+            # NOTE: encode positional samples
+            embedded_pos = self.positional_encoding(
+                # NOTE: `pos_flat`: [B*n_depth_samples, 3]
+                (pos_flat := mx.reshape(pos, [-1, pos.shape[-1]]))
+            ) # [B*n_depth_samples, self.positional_encoding.get_out_dim()]
 
-        mse_coarse = mx.mean((rgb_coarse - target) ** 2)
-        print(f"{mse_coarse=}")
+            # NOTE: encode directional samples
+            embedded_dir = self.directional_encoding(
+                # NOTE: `dir_flat`: [B*n_depth_samples, 3]
+                (dir_flat := mx.reshape(dir, [-1, dir.shape[-1]]))
+            ) # [B*n_depth_samples, self.directional_encoding.get_out_dim()]
 
-        return NotImplementedError
+            embedded = mx.concatenate([embedded_pos, embedded_dir], axis=-1) # [B*n_depth_samples, `embedded_pos.shape[-1]+embedded_dir.shape[-1]`]
+
+            model_outputs_coarse = model.forward(embedded) # [B*n_depth_samples, RGBA]
+            # NOTE: reshape [B*n_depth_samples, RGBA] -> [B, n_depth_samples, RGBA]
+            outputs = mx.reshape(
+                model_outputs_coarse, 
+                [n_rays, self.n_depth_samples, model_outputs_coarse.shape[-1]] # TODO: double-check
+            )
+
+            rgb_coarse, disp_coarse, acc_coarse, weights, depth_map = raw2outputs(
+                outputs, z_vals, rays_d, (raw_noise_std:=0.0), (white_bkgd:=False), (pytest:=False)
+            )
+
+            mse_coarse = mx.mean((rgb_coarse - y_gt) ** 2)
+            
+
+            return mse_coarse, weights
+
+
+        # NOTE: 
+        state_coarse = [self.model_coarse.state, self.optimizer.state]
+        @partial(mx.compile, inputs=state_coarse, outputs=state_coarse)
+        def step_coarse(rays_o, rays_d, z_vals, viewdirs, y):
+
+            loss_and_grad_fn = nn.value_and_grad(self.model_coarse, mlx_mse_coarse)
+            (loss, weights), grads = loss_and_grad_fn(self.model_coarse, rays_o, rays_d, z_vals, viewdirs, y)
+            self.optimizer.update(self.model_coarse, grads)
+
+            return loss, weights
+
+        loss, weights = step_coarse(rays_o, rays_d, z_vals, viewdirs, target)
+        mx.eval(state_coarse)
+
+        return {'loss': loss}
+
     
