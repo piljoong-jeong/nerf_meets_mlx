@@ -90,7 +90,7 @@ class Trainer:
 
     def train_using(
         self, 
-        type_integrator: Integrator,
+        type_integrator: type,
     ):
         
         assert issubclass(type_integrator, Integrator), f"[ERROR] {type_integrator=} is not an {Integrator} type!"
