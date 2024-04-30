@@ -39,7 +39,7 @@ def sample_from_inverse_cdf(
     is_stratified_sampling=False, 
 ):
     
-    raise NotImplementedError, f"[ERROR] using `sample_from_inverse_cdf` introduces cast to `onp.array` back and forth to use `onp.searchsorted` method, which breaks computational graph construction in `mx.compile`! Hence we throw error when you attempted to use this method, but we encourage to use the alternative: `sample_from_inverse_cdf_torch`."
+    raise NotImplementedError(f"[ERROR] using `sample_from_inverse_cdf` introduces cast to `onp.array` back and forth to use `onp.searchsorted` method, which breaks computational graph construction in `mx.compile`! Hence we throw error when you attempted to use this method, but we encourage to use the alternative: `sample_from_inverse_cdf_torch`.")
 
     weights = weights[..., 0] + (histogram_padding := 0.01) # [B, n]
     weights_sum = mx.sum(weights, axis=-1, keepdims=True)
@@ -101,7 +101,7 @@ def sample_from_inverse_cdf(
     return z_vals
 
 @torch.no_grad()
-def sample_from_inverse_cdf_torch(
+def __sample_from_inverse_cdf_torch_impl(
     z_vals, # [B, n]
     weights, # [B, n, 1]
     n_importance_samples, 
@@ -178,3 +178,30 @@ def sample_from_inverse_cdf_torch(
     z_vals = z_mid_from + t_vals * (z_mid_to - z_mid_from)
 
     return z_vals
+
+def sample_from_inverse_cdf_torch(
+    z_vals, # [B, n]
+    weights, # [B, n, 1]
+    n_importance_samples, 
+    eps=1e-5, 
+    is_stratified_sampling=False, 
+) -> mx.array:
+    # NOTE: cast to `torch.Tensor`
+    # NOTE: `torch.searchsorted` not supports `mps` backend
+    z_vals_torch = torch.from_numpy(onp.array(z_vals))# .to("mps")
+    weights_torch = torch.from_numpy(onp.array(weights))# .to("mps")
+    
+    z_importance_samples = __sample_from_inverse_cdf_torch_impl(
+        z_vals_torch, 
+        weights_torch, 
+        n_importance_samples, 
+    )
+
+    # NOTE: cast back to `mx.array`
+    z_importance_samples = z_importance_samples.detach().cpu().numpy()
+    z_importance_samples = mx.array(z_importance_samples)
+
+    # NOTE: concat fine samples with original depth, and sort
+    z_vals_fine = mx.sort(mx.concatenate([z_vals, z_importance_samples], axis=-1), axis=-1) # [B, n_samples + n_importance_samples]
+
+    return z_vals_fine

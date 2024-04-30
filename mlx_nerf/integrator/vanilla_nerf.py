@@ -154,20 +154,7 @@ class VanillaNeRFIntegrator(Integrator):
     def __train_fine(self, n_rays, rays_o, rays_d, viewdirs, z_vals, weights, target):
 
 
-        # NOTE: `torch.searchsorted` not supports `mps` backend
-        z_vals_torch = torch.from_numpy(onp.array(z_vals))# .to("mps")
-        weights_torch = torch.from_numpy(onp.array(weights))# .to("mps")
-        
-        z_importance_samples = sampling.sample_from_inverse_cdf_torch(
-            z_vals_torch, 
-            weights_torch, 
-            self.n_importance_samples, 
-        )
-        z_importance_samples = z_importance_samples.detach().cpu().numpy()
-        z_importance_samples = mx.array(z_importance_samples)
-
-
-        z_vals_fine = mx.sort(mx.concatenate([z_vals, z_importance_samples], axis=-1), axis=-1) # [B, n_samples + n_importance_samples]
+        z_vals_fine = sample_from_inverse_cdf_torch(z_vals, weights, self.n_importance_samples)
 
         def mlx_mse_fine(model, rays_o, rays_d, z_vals_fine, viewdirs, y_gt):
 
