@@ -24,7 +24,7 @@ from mlx_nerf import sampling
 
 def main(
     path_dataset: Path = Path.home() / "Downloads" / "NeRF",
-    max_iter: int = 5000,
+    max_iter: int = 2000,
     
 ):
     
@@ -33,7 +33,7 @@ def main(
     args.config = "configs/lego.txt"
     path_config = path_dataset / args.config
     
-    configs = config_parser.load_config(None, path_config)
+    configs = config_parser.load_config(path_config)
     args = config_parser.update_NeRF_args(configs)
     
     dir_dataset = configs["datadir"]
