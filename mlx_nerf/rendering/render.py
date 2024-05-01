@@ -212,17 +212,11 @@ def render_rays_eval(
     ret["weights"] = weights
 
     # NOTE: `torch.searchsorted` not supports `mps` backend
-    z_vals_torch = torch.from_numpy(onp.array(z_vals))# .to("mps")
-    weights_torch = torch.from_numpy(onp.array(weights))# .to("mps")
-    z_importance_samples = sampling.sample_from_inverse_cdf_using_torch(
-        z_vals_torch, 
-        weights_torch, 
+    z_vals = sampling.sample_from_inverse_cdf_using_torch(
+        z_vals, 
+        weights, 
         N_importance, 
     )
-    z_importance_samples = z_importance_samples.detach().cpu().numpy()
-    z_importance_samples = mx.array(z_importance_samples)
-
-    z_vals = mx.sort(mx.concatenate([z_vals, z_importance_samples], axis=-1), axis=-1) # TODO: double check
     pts = rays_o[..., None, :] + rays_d[..., None, :] * z_vals[..., :, None]
 
     run_fn = network_fine if network_fine else network_coarse
