@@ -247,3 +247,21 @@ class VanillaNeRFIntegrator(Integrator):
             'loss_coarse': loss_coarse, 
             'loss_fine': loss_fine, 
         }
+    
+    def eval(self, ):
+        """
+        Mostly training code, but without mx.eval
+        """
+
+        # NOTE: prepare rays
+        # TODO: refactor this, as in like `RayBundles` or `RaySamples` etc
+        rays_o, rays_d = rays
+        rays_shape = rays_d.shape
+        n_rays = rays_shape[0]
+        viewdirs = rays_d
+        viewdirs = viewdirs / mx.linalg.norm(viewdirs, axis=-1, keepdims=True)
+        viewdirs = mx.reshape(viewdirs, [-1, 3]).astype(mx.float32)
+        near = self.near * mx.ones_like(rays_d[..., :1])
+        far = self.far * mx.ones_like(rays_d[..., :1])
+
+        z_vals = self.sampler_uniform(near, far, self.n_depth_samples)

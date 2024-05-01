@@ -91,6 +91,53 @@ class Trainer:
 
         return batch_rays, target_selected
 
+    def select_pixels_within_image(
+        self, 
+        batch_size, 
+        img_target, 
+        H, W, focal, pose
+    ):
+
+        K = onp.array([
+            [focal, 0, 0.5 * W], 
+            [0, focal, 0.5 * H], 
+            [0, 0, 1]
+        ])
+        rays_o, rays_d = ray.get_rays(H, W, K, mx.array(pose))
+
+        rays_o = mx.array(rays_o) # [H, W, 3]
+        rays_d = mx.array(rays_d) # [H, W, 3]
+
+        coords = onp.meshgrid(
+            onp.arange(0, H), 
+            onp.arange(0, W), 
+            indexing="ij"
+        ) # NOTE: `list`
+        
+        # TODO: convert all `np.ndarray`s into `mx.array`
+        coords[0] = mx.array(coords[0])
+        coords[1] = mx.array(coords[1])
+
+        # TODO: stack meshgrids
+        coords = mx.stack(coords, axis=-1)
+        
+        # TODO: reshape, now [H, W] has been flatten
+        coords = mx.reshape(coords, [-1, 2])
+
+        choice = mx.array(onp.random.choice(coords.shape[0], size=[batch_size], replace=False)) # NOTE: [H*W]
+
+        for idx_start_chunk in range(0, H*W, batch_size):
+
+            selected_coords = coords[choice[idx_start_chunk:idx_start_chunk+batch_size]]
+
+            rays_o = rays_o[selected_coords[:, 0], selected_coords[:, 1]]
+            rays_d = rays_d[selected_coords[:, 0], selected_coords[:, 1]]
+
+            batch_rays = mx.stack([rays_o, rays_d], axis=0)
+            target_selected = mx.array(img_target[selected_coords[:, 0], selected_coords[:, 1]])[..., :3] # NOTE: remove alpha channel # FIXME: slice earlier
+
+            yield batch_rays, target_selected
+
     def train_using(
         self, 
         type_integrator: type,
@@ -129,6 +176,14 @@ class Trainer:
 
 
         idx_testpose = len(self.poses)//2
+        for X, y in self.select_pixels_within_image(
+            self.args.N_rand, 
+            self.images[idx_testpose], 
+            self.H, self.W, self.focal, 
+            self.poses[idx_testpose, :3, :4]
+        ):
+            
+            pass
         
         #ax2 = fig.add_subplot(1, 2, 2)
         #ax2.imshow(to8b(outputs["rgb_fine"]))
