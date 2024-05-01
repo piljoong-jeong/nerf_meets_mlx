@@ -92,9 +92,8 @@ class VanillaNeRFIntegrator(Integrator):
         self.perturb = 0.0
 
     # TODO: consider refactor ray informations into a representative class e.g., `RayBundle` or `RaySample` as in `nerfstudio`
-    def __train_coarse(self, n_rays, rays_o, rays_d, viewdirs, near, far, target):
+    def __train_coarse(self, n_rays, rays_o, rays_d, viewdirs, z_vals, target):
 
-        z_vals = self.sampler_uniform(near, far, self.n_depth_samples)
 
         def mlx_mse_coarse(model, rays_o, rays_d, z_vals, viewdirs, y_gt):
 
@@ -145,12 +144,10 @@ class VanillaNeRFIntegrator(Integrator):
         loss_coarse, weights = step_coarse(rays_o, rays_d, z_vals, viewdirs, target)
         mx.eval(state_coarse)
 
-        return loss_coarse, z_vals, weights
+        return loss_coarse, weights
 
-    def __train_fine(self, n_rays, rays_o, rays_d, viewdirs, z_vals, weights, target):
+    def __train_fine(self, n_rays, rays_o, rays_d, viewdirs, z_vals_fine, target):
 
-
-        z_vals_fine = self.sampler_importance(z_vals, weights, self.n_importance_samples)
 
         def mlx_mse_fine(model, rays_o, rays_d, z_vals_fine, viewdirs, y_gt):
 
@@ -208,6 +205,9 @@ class VanillaNeRFIntegrator(Integrator):
         rays,   # [2, B, 3]
         target, # [B, 3]
     ):
+        
+        # NOTE: prepare rays
+        # TODO: refactor this, as in like `RayBundles` or `RaySamples` etc
         rays_o, rays_d = rays
         rays_shape = rays_d.shape
         n_rays = rays_shape[0]
@@ -217,24 +217,29 @@ class VanillaNeRFIntegrator(Integrator):
         near = self.near * mx.ones_like(rays_d[..., :1])
         far = self.far * mx.ones_like(rays_d[..., :1])
 
+        # NOTE: 1. For coarse NeRF model, sample depth points uniformly
+        z_vals = self.sampler_uniform(near, far, self.n_depth_samples)
 
-        loss_coarse, z_vals, weights = self.__train_coarse(
-            n_rays, 
-            rays_o, 
-            rays_d, 
-            viewdirs, 
-            near, 
-            far, 
-            target
-        )
-
-        loss_fine = self.__train_fine(
+        # NOTE: 2. Using the depth points, coarsely estimate RGB and transmittance values at points
+        loss_coarse, weights = self.__train_coarse(
             n_rays, 
             rays_o, 
             rays_d, 
             viewdirs, 
             z_vals, 
-            weights, 
+            target
+        )
+
+        # NOTE: 3. From coarse transmittance, sample more depth points, append to existing points & sort by value
+        z_vals_fine = self.sampler_importance(z_vals, weights, self.n_importance_samples)
+
+        # NOTE: 4. Estimate RGB and transmittance values using augmented depth samples
+        loss_fine = self.__train_fine(
+            n_rays, 
+            rays_o, 
+            rays_d, 
+            viewdirs, 
+            z_vals_fine, 
             target
         )
 

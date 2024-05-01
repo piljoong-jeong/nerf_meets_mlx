@@ -13,7 +13,7 @@ from tqdm import trange
 
 from mlx_nerf.dataset.dataloader import DatasetType, load_blender_data
 from mlx_nerf.integrator import Integrator
-from mlx_nerf.rendering import ray
+from mlx_nerf.rendering import ray, render
 
 class Trainer:
 
@@ -53,6 +53,7 @@ class Trainer:
         img_target, 
         H, W, focal, pose
     ):
+
         K = onp.array([
             [focal, 0, 0.5 * W], 
             [0, focal, 0.5 * H], 
@@ -123,15 +124,14 @@ class Trainer:
 
         
         ax1 = fig.add_subplot(1, 2, 1)
-        ax1.set_title("Coarse Loss validation")
-        # ax1.set_ylim(0, 1.0)
-        ax1.plot(list_iters, list_losses_coarse)
+        ax1.set_title("Fine Loss validation")
+        ax1.plot(list_iters, list_losses_fine)
 
-        ax2 = fig.add_subplot(1, 2, 2)
-        ax2.set_title("Fine Loss validation")
-        # ax1.set_ylim(0, 1.0)
-        ax2.plot(list_iters, list_losses_fine)
 
+        idx_testpose = len(self.poses)//2
+        
+        #ax2 = fig.add_subplot(1, 2, 2)
+        #ax2.imshow(to8b(outputs["rgb_fine"]))
 
         fig.savefig(f"results/integrator/iter={i}.png")
         
