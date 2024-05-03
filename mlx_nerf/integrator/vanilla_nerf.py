@@ -24,6 +24,7 @@ from mlx_nerf.models.NeRF import NeRF
 from mlx_nerf.rendering import ray, render
 from mlx_nerf.rendering.render import render_rays, raw2outputs
 from mlx_nerf.sampling import sample_from_inverse_cdf_using_torch, uniform
+from mlx_nerf.rendering.renderer import RGBRenderer
 
 class VanillaNeRFIntegrator(Integrator):
     def __init__(self, config) -> None:
@@ -79,7 +80,7 @@ class VanillaNeRFIntegrator(Integrator):
         mx.eval(self.model_fine.parameters())
         
         # NOTE: renderer
-
+        self.rgb_renderer = RGBRenderer()
 
         # NOTE: optimizer
         self.optimizer = optim.Adam(learning_rate=(learning_rate := 5e-4), betas=(0.9, 0.999))
@@ -296,10 +297,12 @@ class VanillaNeRFIntegrator(Integrator):
             [n_rays, self.n_depth_samples, model_outputs_coarse.shape[-1]] # TODO: double-check
         )
 
-        rgbs = outputs[..., :3]
-        densities = outputs[..., 3]
+        rgbs_coarse = outputs[..., :3]
+        densities_coarse = outputs[..., 3]
 
-        weights = render.get_weights(densities, z_vals, rays_d, (raw_noise_std:=0.0), (white_bkgd:=False))
+        weights = render.get_weights(densities_coarse, z_vals, rays_d, (raw_noise_std:=0.0), (white_bkgd:=False))
+
+        rgb_coarse = self.rgb_renderer(rgbs_coarse, densities_coarse)
 
         # TODO: separate each renderer from `raw2outputs`
         return NotImplementedError
