@@ -248,15 +248,24 @@ class VanillaNeRFIntegrator(Integrator):
             'loss_fine': loss_fine, 
         }
     
-    def eval(self, ):
+    def eval(self, H, W, K, pose):
         """
         Mostly training code, but without mx.eval
         """
 
+
+        rays_o, rays_d = ray.get_rays(H, W, K, pose)
+        rays_o = mx.array(rays_o)
+        rays_d = mx.array(rays_d)
+
+        rays_shape = rays_d.shape
+
+        rays_o = mx.reshape(rays_o, [-1, 3]).astype(mx.float32)
+        rays_d = mx.reshape(rays_d, [-1, 3]).astype(mx.float32)
+
+
         # NOTE: prepare rays
         # TODO: refactor this, as in like `RayBundles` or `RaySamples` etc
-        rays_o, rays_d = rays
-        rays_shape = rays_d.shape
         n_rays = rays_shape[0]
         viewdirs = rays_d
         viewdirs = viewdirs / mx.linalg.norm(viewdirs, axis=-1, keepdims=True)
@@ -265,3 +274,36 @@ class VanillaNeRFIntegrator(Integrator):
         far = self.far * mx.ones_like(rays_d[..., :1])
 
         z_vals = self.sampler_uniform(near, far, self.n_depth_samples)
+
+        pos = rays_o[..., None, :] + (z_vals[..., :, None] * rays_d[..., None, :]) # NOTE: [B, n_depth_samples, 3]
+        dir = mx.repeat(viewdirs[:, None, :], repeats=pos.shape[1], axis=1)
+
+        # NOTE: encode positional samples
+        embedded_pos = self.positional_encoding(
+            (pos_flat := mx.reshape(pos, [-1, pos.shape[-1]]))
+        )
+
+        embedded_dir = self.directional_encoding(
+            # NOTE: `dir_flat`: [B*n_depth_samples, 3]
+            (dir_flat := mx.reshape(dir, [-1, dir.shape[-1]]))
+        )
+
+        embedded = mx.concatenate([embedded_pos, embedded_dir], axis=-1)
+        model_outputs_coarse = self.model_coarse.forward(embedded) # [B*n_depth_samples, RGBA]
+        # NOTE: reshape [B*n_depth_samples, RGBA] -> [B, n_depth_samples, RGBA]
+        outputs = mx.reshape(
+            model_outputs_coarse, 
+            [n_rays, self.n_depth_samples, model_outputs_coarse.shape[-1]] # TODO: double-check
+        )
+
+        rgbs = outputs[..., :3]
+        densities = outputs[..., 3]
+
+        weights = render.get_weights(densities, z_vals, rays_d, (raw_noise_std:=0.0), (white_bkgd:=False))
+
+        # TODO: separate each renderer from `raw2outputs`
+        return NotImplementedError
+    
+        # rgb_coarse, disp_coarse, acc_coarse, weights, depth_map = raw2outputs(
+        #     outputs, z_vals, rays_d, (raw_noise_std:=0.0), (white_bkgd:=False), (pytest:=False)
+        # )

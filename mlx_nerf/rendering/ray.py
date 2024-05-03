@@ -68,3 +68,4 @@ def ndc_rays(H, W, focal, near, rays_o, rays_d):
         (rays_o := mx.stack([o0, o1, o2], axis=-1)), 
         (rays_d := mx.stack([d0, d1, d2], axis=-1))
     )
+

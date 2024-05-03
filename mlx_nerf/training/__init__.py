@@ -173,20 +173,7 @@ class Trainer:
         ax1 = fig.add_subplot(1, 2, 1)
         ax1.set_title("Fine Loss validation")
         ax1.plot(list_iters, list_losses_fine)
-
-
-        idx_testpose = len(self.poses)//2
-        for X, y in self.select_pixels_within_image(
-            self.args.N_rand, 
-            self.images[idx_testpose], 
-            self.H, self.W, self.focal, 
-            self.poses[idx_testpose, :3, :4]
-        ):
-            
-            pass
         
-        #ax2 = fig.add_subplot(1, 2, 2)
-        #ax2.imshow(to8b(outputs["rgb_fine"]))
 
         fig.savefig(f"results/integrator/iter={i}.png")
         

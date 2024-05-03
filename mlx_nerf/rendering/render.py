@@ -17,6 +17,56 @@ from mlx_nerf.rendering import ray
 from mlx_nerf import sampling
 from mlx_nerf.sampling import uniform, linear_disparity
 
+
+def get_weights(
+    densities, 
+    z_vals, 
+    rays_d, 
+    raw_noise_std=0, 
+    white_bkgd=False, 
+):
+
+    # NOTE: add noise if desired, to avoid overfitting
+    if raw_noise_std > 0.0:
+        noise = mx.random.normal(densities.shape) * raw_noise_std
+        densities = densities + noise
+
+    # NOTE: relative distance
+    delta_dists = z_vals[..., 1:] - z_vals[..., :-1] # NOTE: [B, n_depth_samples-1]
+    # NOTE: add infinite value at the end of `dists`
+    DIST_LIMIT = mx.array(1e10)
+    DIST_LIMIT = mx.repeat(DIST_LIMIT[None, ...], repeats=z_vals.shape[0], axis=0) # [B, 1]
+    DIST_LIMIT = mx.expand_dims(DIST_LIMIT, axis=-1)
+    delta_dists = mx.concatenate(
+        [
+            delta_dists, 
+            DIST_LIMIT
+        ], axis=-1
+    ) # [B, n]
+    # NOTE: rotate `dists` w.r.t. direction
+    # delta_dists = mx.expand_dims(delta_dists, axis=-1)
+    delta_dists = delta_dists * mx.linalg.norm(rays_d[..., None, :], axis=-1) # [B, n]
+    
+    # NOTE: compute weight: composed alpha
+    # NOTE: from last paragraph, below eq. (3)
+    # alpha = 1.0 - mx.exp(-nn.relu(raw_alpha) * delta_dists)
+    delta_densities = delta_dists * densities # [B, n]
+    delta_densities = mx.expand_dims(delta_densities, axis=-1)
+    alphas = 1.0 - mx.exp(-nn.relu(delta_densities)) # [B, n]
+    
+    transmittance = mx.cumsum(delta_densities[..., :-1, :], axis=-2) # FIXME: [B-1, n]???
+    transmittance = mx.concatenate(
+        [
+            mx.zeros((*transmittance.shape[:1], 1, 1)), 
+            transmittance
+        ], 
+        axis=-2
+    )
+    transmittance = mx.exp(-transmittance)
+    weights = alphas * transmittance # [B, n, 1]
+
+    return weights
+
 def raw2outputs(
     raw, 
     z_vals, # NOTE: [B, `n_depth_samples` from `render_rays(...)`]
@@ -338,3 +388,30 @@ def render(
 
     return ret_list + [ret_dict]
 
+def render_new(
+    H, 
+    W, 
+    K, 
+    pose, 
+    integrator, 
+):
+    if pose is not None:
+        rays_o, rays_d = ray.get_rays(H, W, K, pose)
+        rays_o = mx.array(rays_o)
+        rays_d = mx.array(rays_d)
+
+    # NOTE: prepare rays
+    # TODO: refactor this, as in like `RayBundles` or `RaySamples` etc
+    rays_shape = rays_d.shape
+    n_rays = rays_shape[0]
+    viewdirs = rays_d
+    viewdirs = viewdirs / mx.linalg.norm(viewdirs, axis=-1, keepdims=True)
+    viewdirs = mx.reshape(viewdirs, [-1, 3]).astype(mx.float32)
+    near = integrator.near * mx.ones_like(rays_d[..., :1])
+    far = integrator.far * mx.ones_like(rays_d[..., :1])
+    
+    # NOTE: 1. For coarse NeRF model, sample depth points uniformly
+    z_vals = integrator.sampler_uniform(near, far, integrator.n_depth_samples)
+    z_vals_fine = integrator.sampler_importance(z_vals, weights, integrator.n_importance_samples)
+
+    return
